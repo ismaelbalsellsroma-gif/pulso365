@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
-import { KpiCard } from '@/components/KpiCard';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { mockProductos, fmt } from '@/lib/mock-data';
-import { Search, Package, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
@@ -15,62 +11,84 @@ export default function ProductosPage() {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-5">
       <PageHeader title="Productos" description="Catálogo de productos creados automáticamente desde albaranes" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard title="Total Productos" value={String(mockProductos.length)} icon={<Package className="h-4 w-4" />} />
-        <KpiCard title="Con cambio precio" value="3" icon={<TrendingUp className="h-4 w-4" />} />
-        <KpiCard title="Alertas pendientes" value="2" icon={<AlertTriangle className="h-4 w-4" />} className="text-amber-600" />
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-up">
+        <div className="panel-card">
+          <div className="panel-card-header"><Package className="h-4 w-4" /><span>Total Productos</span></div>
+          <div className="panel-card-value text-2xl">{mockProductos.length}</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><TrendingUp className="h-4 w-4" /><span>Con cambio precio</span></div>
+          <div className="panel-card-value text-2xl">3</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>Alertas pendientes</span></div>
+          <div className="panel-card-value text-2xl" style={{ color: 'hsl(var(--warning))' }}>2</div>
+        </div>
       </div>
 
-      <div className="relative max-w-md">
+      <div className="relative max-w-md animate-fade-in-up animate-delay-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar producto o referencia..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        <Input placeholder="Buscar producto o referencia..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card" />
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ref</TableHead>
-              <TableHead>Producto</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead>Proveedor</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Anterior</TableHead>
-              <TableHead className="text-right">Variación</TableHead>
-              <TableHead>Última compra</TableHead>
-              <TableHead className="text-center">Nº</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map(p => {
-              let variacion = '—';
-              let varClass = '';
-              if (p.precio_anterior > 0 && Math.abs(p.precio_actual - p.precio_anterior) > 0.001) {
-                const pct = ((p.precio_actual - p.precio_anterior) / p.precio_anterior * 100);
-                variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
-                varClass = pct > 0 ? 'text-red-500' : 'text-green-600';
-              }
-              return (
-                <TableRow key={p.id} className="group cursor-pointer hover:bg-muted/50">
-                  <TableCell className="text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</TableCell>
-                  <TableCell className="font-medium">{p.nombre}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-[10px]">{p.categoria_icon} {p.categoria_nombre}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{p.proveedor_nombre}</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{fmt(p.precio_actual)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground tabular-nums">{p.precio_anterior > 0 ? fmt(p.precio_anterior) : '—'}</TableCell>
-                  <TableCell className={`text-right font-medium tabular-nums ${varClass}`}>{variacion}</TableCell>
-                  <TableCell className="tabular-nums">{p.ultima_compra}</TableCell>
-                  <TableCell className="text-center tabular-nums">{p.num_compras}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+      {/* Table */}
+      <div className="bg-card border rounded-lg overflow-hidden animate-fade-in-up animate-delay-2">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[hsl(var(--surface-offset))]">
+                {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Anterior', 'Var.', 'Última compra', 'Nº'].map(h => (
+                  <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
+                    ['Precio', 'Anterior', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
+                  }`}>{h}</th>
+                ))}
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p => {
+                let variacion = '—';
+                let varClass = '';
+                if (p.precio_anterior > 0 && Math.abs(p.precio_actual - p.precio_anterior) > 0.001) {
+                  const pct = ((p.precio_actual - p.precio_anterior) / p.precio_anterior * 100);
+                  variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+                  varClass = pct > 0 ? 'text-[hsl(var(--error))] font-semibold' : 'text-[hsl(var(--success))] font-semibold';
+                }
+                return (
+                  <tr key={p.id} className="border-t border-[hsl(var(--divider))] hover:bg-[hsl(var(--surface-offset))] transition-colors group cursor-pointer">
+                    <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</td>
+                    <td className="px-4 py-3 font-medium">{p.nombre}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[hsl(var(--surface-offset))] text-muted-foreground">
+                        {p.categoria_icon} {p.categoria_nombre}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{p.proveedor_nombre}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(p.precio_actual)}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{p.precio_anterior > 0 ? fmt(p.precio_anterior) : '—'}</td>
+                    <td className={`px-4 py-3 text-right tabular-nums ${varClass}`}>{variacion}</td>
+                    <td className="px-4 py-3 tabular-nums whitespace-nowrap">{p.ultima_compra}</td>
+                    <td className="px-4 py-3 text-center tabular-nums">{p.num_compras}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="p-1.5 rounded-md text-muted-foreground hover:text-primary transition-colors">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

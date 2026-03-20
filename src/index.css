@@ -9,42 +9,47 @@
     --font-body: 'Satoshi', 'General Sans', system-ui, sans-serif;
     --font-display: 'General Sans', 'Satoshi', system-ui, sans-serif;
 
-    /* Light mode */
+    /* Light mode — warm off-white like original */
     --background: 40 14% 95%;
-    --foreground: 40 20% 14%;
+    --foreground: 42 20% 13%;
     --card: 0 0% 100%;
-    --card-foreground: 40 20% 14%;
+    --card-foreground: 42 20% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 40 20% 14%;
+    --popover-foreground: 42 20% 13%;
     --primary: 183 97% 22%;
     --primary-foreground: 40 33% 97%;
-    --secondary: 37 14% 92%;
-    --secondary-foreground: 40 20% 14%;
-    --muted: 37 14% 92%;
+    --secondary: 37 14% 93%;
+    --secondary-foreground: 42 20% 13%;
+    --muted: 37 14% 93%;
     --muted-foreground: 40 3% 47%;
-    --accent: 37 14% 92%;
-    --accent-foreground: 40 20% 14%;
+    --accent: 37 14% 93%;
+    --accent-foreground: 42 20% 13%;
     --destructive: 320 56% 41%;
     --destructive-foreground: 40 33% 97%;
-    --border: 37 10% 83%;
-    --input: 37 10% 83%;
+    --border: 37 12% 84%;
+    --input: 37 12% 84%;
     --ring: 183 97% 22%;
     --radius: 0.5rem;
 
     --success: 100 56% 31%;
-    --success-foreground: 40 33% 97%;
+    --success-highlight: 100 22% 85%;
     --warning: 24 70% 34%;
-    --warning-foreground: 40 33% 97%;
+    --warning-highlight: 24 22% 85%;
+    --error: 320 56% 41%;
+    --error-highlight: 320 15% 87%;
     --info: 200 100% 29%;
-    --info-foreground: 40 33% 97%;
+
+    --surface-offset: 37 16% 93%;
+    --surface-dynamic: 37 10% 88%;
+    --divider: 37 8% 85%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 40 20% 14%;
+    --sidebar-foreground: 42 20% 13%;
     --sidebar-primary: 183 97% 22%;
     --sidebar-primary-foreground: 40 33% 97%;
-    --sidebar-accent: 37 14% 92%;
-    --sidebar-accent-foreground: 40 20% 14%;
-    --sidebar-border: 37 10% 87%;
+    --sidebar-accent: 183 20% 92%;
+    --sidebar-accent-foreground: 183 97% 22%;
+    --sidebar-border: 37 12% 87%;
     --sidebar-ring: 183 97% 22%;
   }
 
@@ -56,7 +61,7 @@
     --popover: 40 8% 10%;
     --popover-foreground: 40 3% 80%;
     --primary: 189 35% 47%;
-    --primary-foreground: 40 8% 16%;
+    --primary-foreground: 40 8% 8%;
     --secondary: 40 5% 14%;
     --secondary-foreground: 40 3% 80%;
     --muted: 40 5% 14%;
@@ -64,25 +69,30 @@
     --accent: 40 5% 14%;
     --accent-foreground: 40 3% 80%;
     --destructive: 320 52% 60%;
-    --destructive-foreground: 40 8% 16%;
+    --destructive-foreground: 40 8% 8%;
     --border: 40 4% 22%;
     --input: 40 4% 22%;
     --ring: 189 35% 47%;
 
     --success: 100 44% 47%;
-    --success-foreground: 40 8% 8%;
+    --success-highlight: 100 15% 22%;
     --warning: 24 52% 48%;
-    --warning-foreground: 40 8% 8%;
+    --warning-highlight: 24 20% 28%;
+    --error: 320 52% 60%;
+    --error-highlight: 320 12% 27%;
     --info: 207 56% 56%;
-    --info-foreground: 40 8% 8%;
+
+    --surface-offset: 40 5% 12%;
+    --surface-dynamic: 40 4% 17%;
+    --divider: 40 4% 15%;
 
     --sidebar-background: 40 8% 7%;
     --sidebar-foreground: 40 3% 80%;
     --sidebar-primary: 189 35% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 3% 11%;
-    --sidebar-accent-foreground: 40 3% 80%;
-    --sidebar-border: 40 3% 11%;
+    --sidebar-accent: 189 12% 15%;
+    --sidebar-accent-foreground: 189 35% 70%;
+    --sidebar-border: 40 3% 14%;
     --sidebar-ring: 189 35% 47%;
   }
 }
@@ -94,6 +104,8 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
@@ -108,3 +120,133 @@
 
 /* Tabular nums for data */
 .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Panel card styles matching original */
+.panel-card {
+  @apply bg-card rounded-lg p-5;
+  border: 1px solid hsl(var(--divider));
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.panel-card:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+.panel-card-header {
+  @apply flex items-center gap-2 mb-3 text-muted-foreground text-xs font-semibold uppercase tracking-wide;
+}
+.panel-card-header svg {
+  opacity: 0.6;
+}
+
+.panel-card-value {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-card-sub {
+  @apply text-xs text-muted-foreground mt-1;
+}
+
+/* Panel ventas accent */
+.panel-ventas {
+  border-left: 4px solid hsl(var(--success));
+}
+.panel-ventas .panel-card-value {
+  color: hsl(var(--success));
+}
+
+/* Panel compras accent */
+.panel-compras {
+  border-left: 4px solid hsl(var(--primary));
+}
+
+/* Panel resultado */
+.panel-resultado {
+  @apply bg-card rounded-lg text-center;
+  border: 2px solid hsl(var(--border));
+  padding: 1.25rem 1.5rem;
+}
+.panel-resultado.positivo {
+  border-color: hsl(var(--success));
+  background: hsl(var(--success-highlight));
+}
+.panel-resultado.negativo {
+  border-color: hsl(0 72% 65%);
+  background: hsl(0 100% 98%);
+}
+.dark .panel-resultado.positivo {
+  background: hsl(var(--success) / 0.08);
+}
+.dark .panel-resultado.negativo {
+  background: hsl(0 72% 65% / 0.08);
+}
+
+/* Proration banner */
+.panel-proration-banner {
+  @apply flex items-center gap-2 rounded-md text-sm font-semibold;
+  background: hsl(48 96% 89%);
+  color: hsl(26 80% 30%);
+  border: 1px solid hsl(48 94% 78%);
+  padding: 0.5rem 0.75rem;
+}
+.dark .panel-proration-banner {
+  background: hsl(26 80% 8%);
+  color: hsl(48 94% 78%);
+  border-color: hsl(26 80% 15%);
+}
+
+/* Status badges matching original */
+.status-procesado {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+  background: hsl(var(--success-highlight));
+  color: hsl(var(--success));
+}
+.status-pendiente {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+  background: hsl(var(--warning-highlight));
+  color: hsl(var(--warning));
+}
+.status-verificar {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+  background: hsl(var(--warning-highlight));
+  color: hsl(var(--warning));
+}
+.status-error {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+  background: hsl(var(--error-highlight));
+  color: hsl(var(--error));
+}
+
+/* Proveedor avatar initials */
+.prov-avatar {
+  @apply w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+/* Scan dropzone */
+.scan-dropzone {
+  @apply rounded-lg text-center cursor-pointer transition-colors;
+  border: 2px dashed hsl(var(--border));
+  padding: 2.5rem 1rem;
+}
+.scan-dropzone:hover {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.04);
+}
+
+/* Animate in */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-delay-1 { animation-delay: 60ms; }
+.animate-delay-2 { animation-delay: 120ms; }
+.animate-delay-3 { animation-delay: 180ms; }
+.animate-delay-4 { animation-delay: 240ms; }
