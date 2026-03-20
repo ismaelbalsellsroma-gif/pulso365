@@ -1,116 +1,85 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
-import { Card } from '@/components/ui/card';
-import { mockDashboard, fmt } from '@/lib/mock-data';
+import { fetchAlbaranes, fetchPersonal, fetchAlquiler, fetchBancos, fetchSuministros, fetchArqueos, fmt } from '@/lib/queries';
 import {
-  DollarSign, ShoppingCart, Users, Home, CreditCard, Zap, TrendingUp, TrendingDown, Clock,
+  DollarSign, ShoppingCart, Users, Home, CreditCard, Zap, TrendingUp, TrendingDown,
   Coffee, UtensilsCrossed, Plus,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-const d = mockDashboard;
-
-const comprasBreakdown = [
-  { name: 'Bebida', value: d.compras.bebida, pct: d.compras.bebida_pct, color: 'hsl(200, 70%, 50%)' },
-  { name: 'Comida', value: d.compras.comida, pct: d.compras.comida_pct, color: 'hsl(100, 56%, 40%)' },
-  { name: 'Otros', value: d.compras.otros, pct: d.compras.otros_pct, color: 'hsl(40, 20%, 55%)' },
-];
-
-const costStructure = [
-  { name: 'Compras', value: d.compras.total },
-  { name: 'Personal', value: d.personal.total },
-  { name: 'Alquiler', value: d.alquiler.total },
-  { name: 'Bancos', value: d.bancos.total },
-  { name: 'Suministros', value: d.suministros.total },
-  { name: 'Resultado', value: d.resultado },
-];
-
 export default function DashboardPage() {
   const nav = useNavigate();
-  const positivo = d.resultado >= 0;
+  const { data: albaranes = [] } = useQuery({ queryKey: ['albaranes'], queryFn: fetchAlbaranes });
+  const { data: personal = [] } = useQuery({ queryKey: ['personal'], queryFn: fetchPersonal });
+  const { data: alquiler = [] } = useQuery({ queryKey: ['alquiler'], queryFn: fetchAlquiler });
+  const { data: bancos = [] } = useQuery({ queryKey: ['bancos'], queryFn: fetchBancos });
+  const { data: suministros = [] } = useQuery({ queryKey: ['suministros'], queryFn: () => fetchSuministros() });
+  const { data: arqueos = [] } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
+
+  const ventas = arqueos.reduce((s, a) => s + Number(a.total_sin_iva || 0), 0);
+  const comprasTotal = albaranes.reduce((s, a) => s + Number(a.importe || 0), 0);
+  const personalTotal = personal.filter(e => e.activo).reduce((s, e) => s + Number(e.coste_mensual || 0), 0);
+  const alquilerTotal = alquiler.filter(a => a.activo).reduce((s, a) => s + Number(a.importe_mensual || 0), 0);
+  const bancosTotal = bancos.filter(b => b.activo).reduce((s, b) => s + Number(b.importe_mensual || 0), 0);
+  const suministrosTotal = suministros.reduce((s, x) => s + Number(x.importe || 0), 0);
+  const resultado = ventas - comprasTotal - personalTotal - alquilerTotal - bancosTotal - suministrosTotal;
+
+  const pct = (v: number) => ventas > 0 ? Math.round(v / ventas * 100) : 0;
+  const positivo = resultado >= 0;
+
+  const costStructure = [
+    { name: 'Compras', value: comprasTotal },
+    { name: 'Personal', value: personalTotal },
+    { name: 'Alquiler', value: alquilerTotal },
+    { name: 'Bancos', value: bancosTotal },
+    { name: 'Suministros', value: suministrosTotal },
+    { name: 'Resultado', value: Math.max(resultado, 0) },
+  ];
+
+  const comprasBreakdown = [
+    { name: 'Compras', value: comprasTotal, color: 'hsl(200, 70%, 50%)' },
+  ];
 
   return (
     <div className="space-y-5">
       <PageHeader title="Panel de Control" description="Resumen del período seleccionado" />
 
-      {d.prorrateado && (
-        <div className="panel-proration-banner animate-fade-in-up">
-          <Clock className="h-4 w-4 shrink-0" />
-          Costes fijos proporcionales a día {d.dia_actual} de {d.dias_mes}
-        </div>
-      )}
-
       {/* Row 1: Ventas + Compras */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-1">
-        {/* VENTAS */}
         <div className="panel-card panel-ventas">
-          <div className="panel-card-header">
-            <DollarSign className="h-5 w-5" />
-            <span>Ventas</span>
-          </div>
-          <div className="panel-card-value">{fmt(d.ventas)}</div>
-          <div className="panel-card-sub">sin IVA</div>
+          <div className="panel-card-header"><DollarSign className="h-5 w-5" /><span>Ventas</span></div>
+          <div className="panel-card-value">{fmt(ventas)}</div>
+          <div className="panel-card-sub">sin IVA · {arqueos.length} arqueos</div>
         </div>
-
-        {/* COMPRAS */}
         <div className="panel-card panel-compras">
-          <div className="panel-card-header">
-            <ShoppingCart className="h-5 w-5" />
-            <span>Compras</span>
-          </div>
-          <div className="panel-card-value">{fmt(d.compras.total)}</div>
-          <div className="panel-card-sub">{d.compras.pct}% sobre ventas · sin IVA</div>
-          <div className="mt-4 pt-3 border-t space-y-2">
-            {comprasBreakdown.map(item => (
-              <div key={item.name} className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  {item.name === 'Bebida' && <Coffee className="h-3.5 w-3.5 opacity-50" />}
-                  {item.name === 'Comida' && <UtensilsCrossed className="h-3.5 w-3.5 opacity-50" />}
-                  {item.name === 'Otros' && <Plus className="h-3.5 w-3.5 opacity-50" />}
-                  {item.name}
-                </span>
-                <span className="font-semibold tabular-nums">
-                  {fmt(item.value)} <small className="font-normal text-muted-foreground ml-1">{item.pct}%</small>
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="panel-card-header"><ShoppingCart className="h-5 w-5" /><span>Compras</span></div>
+          <div className="panel-card-value">{fmt(comprasTotal)}</div>
+          <div className="panel-card-sub">{pct(comprasTotal)}% sobre ventas · {albaranes.length} albaranes</div>
         </div>
       </div>
 
       {/* Row 2: Fixed costs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up animate-delay-2">
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/personal')}>
-          <div className="panel-card-header">
-            <Users className="h-5 w-5" />
-            <span>Personal</span>
-          </div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.personal.total)}</div>
-          <div className="panel-card-sub">{d.personal.pct}% sobre ventas</div>
+          <div className="panel-card-header"><Users className="h-5 w-5" /><span>Personal</span></div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(personalTotal)}</div>
+          <div className="panel-card-sub">{pct(personalTotal)}% sobre ventas</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/alquiler')}>
-          <div className="panel-card-header">
-            <Home className="h-5 w-5" />
-            <span>Alquiler</span>
-          </div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.alquiler.total)}</div>
-          <div className="panel-card-sub">{d.alquiler.pct}% sobre ventas</div>
+          <div className="panel-card-header"><Home className="h-5 w-5" /><span>Alquiler</span></div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(alquilerTotal)}</div>
+          <div className="panel-card-sub">{pct(alquilerTotal)}% sobre ventas</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/bancos')}>
-          <div className="panel-card-header">
-            <CreditCard className="h-5 w-5" />
-            <span>Bancos</span>
-          </div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.bancos.total)}</div>
-          <div className="panel-card-sub">{d.bancos.pct}% sobre ventas</div>
+          <div className="panel-card-header"><CreditCard className="h-5 w-5" /><span>Bancos</span></div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(bancosTotal)}</div>
+          <div className="panel-card-sub">{pct(bancosTotal)}% sobre ventas</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/suministros')}>
-          <div className="panel-card-header">
-            <Zap className="h-5 w-5" />
-            <span>Suministros</span>
-          </div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.suministros.total)}</div>
-          <div className="panel-card-sub">{d.suministros.pct}% sobre ventas</div>
+          <div className="panel-card-header"><Zap className="h-5 w-5" /><span>Suministros</span></div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(suministrosTotal)}</div>
+          <div className="panel-card-sub">{pct(suministrosTotal)}% sobre ventas</div>
         </div>
       </div>
 
@@ -121,9 +90,9 @@ export default function DashboardPage() {
           Resultado
         </div>
         <p className={`text-4xl font-extrabold tabular-nums tracking-tight ${positivo ? 'text-[hsl(var(--success))]' : 'text-red-500'}`}>
-          {fmt(d.resultado)}
+          {fmt(resultado)}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">{d.resultado_pct}% margen sobre ventas</p>
+        <p className="text-xs text-muted-foreground mt-1">{pct(resultado)}% margen sobre ventas</p>
       </div>
 
       {/* Charts */}
@@ -142,19 +111,18 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="panel-card">
-          <h3 className="text-sm font-semibold mb-4">Desglose Compras</h3>
-          <div className="h-56 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={comprasBreakdown} cx="50%" cy="50%" outerRadius={80} innerRadius={40} dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} fontSize={11}>
-                  {comprasBreakdown.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', fontSize: '12px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <h3 className="text-sm font-semibold mb-4">Resumen</h3>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Ventas</span><span className="font-semibold tabular-nums">{fmt(ventas)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">− Compras</span><span className="font-semibold tabular-nums">{fmt(comprasTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">− Personal</span><span className="font-semibold tabular-nums">{fmt(personalTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">− Alquiler</span><span className="font-semibold tabular-nums">{fmt(alquilerTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">− Bancos</span><span className="font-semibold tabular-nums">{fmt(bancosTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">− Suministros</span><span className="font-semibold tabular-nums">{fmt(suministrosTotal)}</span></div>
+            <div className="border-t pt-2 flex justify-between font-bold">
+              <span>= Resultado</span>
+              <span className={`tabular-nums ${positivo ? 'text-[hsl(var(--success))]' : 'text-red-500'}`}>{fmt(resultado)}</span>
+            </div>
           </div>
         </div>
       </div>
