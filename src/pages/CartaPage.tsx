@@ -1,7 +1,5 @@
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { mockFamilias } from '@/lib/mock-data';
 import { Plus, ChefHat } from 'lucide-react';
 
 const mockPlatos = [
@@ -15,40 +13,42 @@ const mockPlatos = [
 
 export default function CartaPage() {
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-5">
       <PageHeader title="Carta" description="Elaboraciones y escandallos — controla el food cost de cada plato">
         <Button className="gap-2 active:scale-95"><Plus className="h-4 w-4" /> Nueva Elaboración</Button>
       </PageHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in-up">
         {mockPlatos.map(p => (
-          <Card key={p.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer group active:scale-[0.98]">
+          <div key={p.id} className="panel-card cursor-pointer group active:scale-[0.98]">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <ChefHat className="h-5 w-5 text-primary" />
+              <div className="w-10 h-10 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center shrink-0">
+                <ChefHat className="h-5 w-5 text-[hsl(var(--primary))]" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-sm truncate">{p.nombre}</h3>
                 <p className="text-xs text-muted-foreground">{p.familia}</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t">
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[hsl(var(--divider))]">
               <div>
-                <p className="text-[10px] text-muted-foreground">PVP</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">PVP</p>
                 <p className="font-semibold tabular-nums text-sm">{p.pvp.toFixed(2)} €</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">Coste</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Coste</p>
                 <p className="font-semibold tabular-nums text-sm">{p.coste.toFixed(2)} €</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">Margen</p>
-                <p className={`font-bold tabular-nums text-sm ${p.margen >= 65 ? 'text-green-600' : p.margen >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Margen</p>
+                <p className={`font-bold tabular-nums text-sm ${
+                  p.margen >= 65 ? 'text-[hsl(var(--success))]' : p.margen >= 50 ? 'text-[hsl(var(--warning))]' : 'text-[hsl(var(--error))]'
+                }`}>
                   {p.margen.toFixed(1)}%
                 </p>
               </div>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
     </div>

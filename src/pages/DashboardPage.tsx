@@ -1,19 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
-import { KpiCard } from '@/components/KpiCard';
 import { Card } from '@/components/ui/card';
 import { mockDashboard, fmt } from '@/lib/mock-data';
 import {
   DollarSign, ShoppingCart, Users, Home, CreditCard, Zap, TrendingUp, TrendingDown, Clock,
+  Coffee, UtensilsCrossed, Plus,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const d = mockDashboard;
 
 const comprasBreakdown = [
-  { name: 'Bebida', value: d.compras.bebida, color: 'hsl(200, 70%, 50%)' },
-  { name: 'Comida', value: d.compras.comida, color: 'hsl(100, 56%, 40%)' },
-  { name: 'Otros', value: d.compras.otros, color: 'hsl(40, 20%, 55%)' },
+  { name: 'Bebida', value: d.compras.bebida, pct: d.compras.bebida_pct, color: 'hsl(200, 70%, 50%)' },
+  { name: 'Comida', value: d.compras.comida, pct: d.compras.comida_pct, color: 'hsl(100, 56%, 40%)' },
+  { name: 'Otros', value: d.compras.otros, pct: d.compras.otros_pct, color: 'hsl(40, 20%, 55%)' },
 ];
 
 const costStructure = [
@@ -30,102 +30,133 @@ export default function DashboardPage() {
   const positivo = d.resultado >= 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-5">
       <PageHeader title="Panel de Control" description="Resumen del período seleccionado" />
 
       {d.prorrateado && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-          <Clock className="h-3.5 w-3.5" />
+        <div className="panel-proration-banner animate-fade-in-up">
+          <Clock className="h-4 w-4 shrink-0" />
           Costes fijos proporcionales a día {d.dia_actual} de {d.dias_mes}
         </div>
       )}
 
       {/* Row 1: Ventas + Compras */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <KpiCard
-          title="Ventas"
-          value={fmt(d.ventas)}
-          subtitle="sin IVA"
-          icon={<DollarSign className="h-4 w-4" />}
-        />
-        <KpiCard
-          title="Compras"
-          value={fmt(d.compras.total)}
-          subtitle={`${d.compras.pct}% sobre ventas · sin IVA`}
-          icon={<ShoppingCart className="h-4 w-4" />}
-        >
-          <div className="mt-3 space-y-1.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-1">
+        {/* VENTAS */}
+        <div className="panel-card panel-ventas">
+          <div className="panel-card-header">
+            <DollarSign className="h-5 w-5" />
+            <span>Ventas</span>
+          </div>
+          <div className="panel-card-value">{fmt(d.ventas)}</div>
+          <div className="panel-card-sub">sin IVA</div>
+        </div>
+
+        {/* COMPRAS */}
+        <div className="panel-card panel-compras">
+          <div className="panel-card-header">
+            <ShoppingCart className="h-5 w-5" />
+            <span>Compras</span>
+          </div>
+          <div className="panel-card-value">{fmt(d.compras.total)}</div>
+          <div className="panel-card-sub">{d.compras.pct}% sobre ventas · sin IVA</div>
+          <div className="mt-4 pt-3 border-t space-y-2">
             {comprasBreakdown.map(item => (
-              <div key={item.name} className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">{item.name}</span>
-                <span className="font-medium tabular-nums">{fmt(item.value)}</span>
+              <div key={item.name} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  {item.name === 'Bebida' && <Coffee className="h-3.5 w-3.5 opacity-50" />}
+                  {item.name === 'Comida' && <UtensilsCrossed className="h-3.5 w-3.5 opacity-50" />}
+                  {item.name === 'Otros' && <Plus className="h-3.5 w-3.5 opacity-50" />}
+                  {item.name}
+                </span>
+                <span className="font-semibold tabular-nums">
+                  {fmt(item.value)} <small className="font-normal text-muted-foreground ml-1">{item.pct}%</small>
+                </span>
               </div>
             ))}
           </div>
-        </KpiCard>
+        </div>
       </div>
 
       {/* Row 2: Fixed costs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard title="Personal" value={fmt(d.personal.total)} subtitle={`${d.personal.pct}% sobre ventas`}
-          icon={<Users className="h-4 w-4" />} onClick={() => nav('/personal')} />
-        <KpiCard title="Alquiler" value={fmt(d.alquiler.total)} subtitle={`${d.alquiler.pct}% sobre ventas`}
-          icon={<Home className="h-4 w-4" />} onClick={() => nav('/alquiler')} />
-        <KpiCard title="Bancos" value={fmt(d.bancos.total)} subtitle={`${d.bancos.pct}% sobre ventas`}
-          icon={<CreditCard className="h-4 w-4" />} onClick={() => nav('/bancos')} />
-        <KpiCard title="Suministros" value={fmt(d.suministros.total)} subtitle={`${d.suministros.pct}% sobre ventas`}
-          icon={<Zap className="h-4 w-4" />} onClick={() => nav('/suministros')} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up animate-delay-2">
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/personal')}>
+          <div className="panel-card-header">
+            <Users className="h-5 w-5" />
+            <span>Personal</span>
+          </div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.personal.total)}</div>
+          <div className="panel-card-sub">{d.personal.pct}% sobre ventas</div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/alquiler')}>
+          <div className="panel-card-header">
+            <Home className="h-5 w-5" />
+            <span>Alquiler</span>
+          </div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.alquiler.total)}</div>
+          <div className="panel-card-sub">{d.alquiler.pct}% sobre ventas</div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/bancos')}>
+          <div className="panel-card-header">
+            <CreditCard className="h-5 w-5" />
+            <span>Bancos</span>
+          </div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.bancos.total)}</div>
+          <div className="panel-card-sub">{d.bancos.pct}% sobre ventas</div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/suministros')}>
+          <div className="panel-card-header">
+            <Zap className="h-5 w-5" />
+            <span>Suministros</span>
+          </div>
+          <div className="panel-card-value text-xl md:text-2xl">{fmt(d.suministros.total)}</div>
+          <div className="panel-card-sub">{d.suministros.pct}% sobre ventas</div>
+        </div>
       </div>
 
       {/* Resultado */}
-      <Card className={`p-5 border-2 ${positivo ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {positivo ? <TrendingUp className="h-6 w-6 text-green-600" /> : <TrendingDown className="h-6 w-6 text-red-500" />}
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resultado</p>
-              <p className={`text-3xl font-bold tabular-nums ${positivo ? 'text-green-600' : 'text-red-500'}`}>
-                {fmt(d.resultado)}
-              </p>
-            </div>
-          </div>
-          <div className={`text-right ${positivo ? 'text-green-600' : 'text-red-500'}`}>
-            <p className="text-2xl font-bold tabular-nums">{d.resultado_pct}%</p>
-            <p className="text-xs text-muted-foreground">margen</p>
-          </div>
+      <div className={`panel-resultado ${positivo ? 'positivo' : 'negativo'} animate-fade-in-up animate-delay-3`}>
+        <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+          {positivo ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+          Resultado
         </div>
-      </Card>
+        <p className={`text-4xl font-extrabold tabular-nums tracking-tight ${positivo ? 'text-[hsl(var(--success))]' : 'text-red-500'}`}>
+          {fmt(d.resultado)}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">{d.resultado_pct}% margen sobre ventas</p>
+      </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4">
-          <h3 className="text-sm font-medium mb-3">Estructura de Costes</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-4">
+        <div className="panel-card">
+          <h3 className="text-sm font-semibold mb-4">Estructura de Costes</h3>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={costStructure} layout="vertical" margin={{ left: 80 }}>
-                <XAxis type="number" tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} fontSize={11} />
-                <YAxis type="category" dataKey="name" fontSize={11} width={70} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <XAxis type="number" tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                <YAxis type="category" dataKey="name" fontSize={11} width={70} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', fontSize: '12px' }} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Card>
-        <Card className="p-4">
-          <h3 className="text-sm font-medium mb-3">Desglose Compras</h3>
+        </div>
+        <div className="panel-card">
+          <h3 className="text-sm font-semibold mb-4">Desglose Compras</h3>
           <div className="h-56 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={comprasBreakdown} cx="50%" cy="50%" outerRadius={80} innerRadius={40} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} fontSize={11}>
+                <Pie data={comprasBreakdown} cx="50%" cy="50%" outerRadius={80} innerRadius={40} dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} fontSize={11}>
                   {comprasBreakdown.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', fontSize: '12px' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
