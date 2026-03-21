@@ -202,6 +202,44 @@ export type Database = {
         }
         Relationships: []
       }
+      aprendizaje: {
+        Row: {
+          created_at: string
+          datos_antes: Json | null
+          datos_despues: Json | null
+          descripcion: string
+          id: string
+          proveedor_id: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          descripcion: string
+          id?: string
+          proveedor_id?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          descripcion?: string
+          id?: string
+          proveedor_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprendizaje_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arqueo_familias: {
         Row: {
           arqueo_id: string
