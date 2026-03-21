@@ -114,3 +114,80 @@ export async function deleteSuministro(id: string) {
   const { error } = await supabase.from('suministros').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ─── Familias ───
+export async function upsertFamilia(data: {
+  id?: string;
+  nombre: string;
+  icon?: string;
+  orden?: number;
+}) {
+  const { id, ...rest } = data;
+  if (id) {
+    const { error } = await supabase.from('familias').update(rest).eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('familias').insert(rest);
+    if (error) throw error;
+  }
+}
+
+export async function deleteFamilia(id: string) {
+  const { error } = await supabase.from('familias').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Productos ───
+export async function upsertProducto(data: {
+  id?: string;
+  nombre: string;
+  nombre_normalizado?: string;
+  referencia?: string;
+  unidad?: string;
+  precio_actual?: number;
+  proveedor_nombre?: string;
+  subcategoria_id?: string;
+}) {
+  const { id, ...rest } = data;
+  if (!rest.nombre_normalizado) {
+    rest.nombre_normalizado = rest.nombre.toLowerCase().trim();
+  }
+  if (id) {
+    const { error } = await supabase.from('productos').update(rest).eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('productos').insert(rest as any);
+    if (error) throw error;
+  }
+}
+
+export async function deleteProducto(id: string) {
+  const { error } = await supabase.from('productos').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Platos (Carta) ───
+export async function upsertPlato(data: {
+  id?: string;
+  nombre: string;
+  familia_id?: string;
+  pvp?: number;
+  coste?: number;
+  margen_pct?: number;
+}) {
+  const { id, ...rest } = data;
+  if (id) {
+    const { error } = await supabase.from('platos').update(rest).eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('platos').insert(rest);
+    if (error) throw error;
+  }
+}
+
+export async function deletePlato(id: string) {
+  // Delete ingredientes first
+  await supabase.from('plato_ingredientes').delete().eq('plato_id', id);
+  const { error } = await supabase.from('platos').delete().eq('id', id);
+  if (error) throw error;
+}
