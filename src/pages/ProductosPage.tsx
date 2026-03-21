@@ -13,7 +13,8 @@ import { upsertProducto, deleteProducto } from '@/lib/mutations';
 import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '' };
+const UNIDADES_CONTENIDO = ['kg', 'g', 'L', 'ml', 'ud'];
+const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '', contenido_neto: '' as string, contenido_unidad: 'kg' };
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
@@ -66,8 +67,9 @@ export default function ProductosPage() {
         unidad: form.unidad,
         precio_actual: Number(form.precio_actual),
         proveedor_nombre: form.proveedor_nombre,
+        contenido_neto: form.contenido_neto ? parseFloat(form.contenido_neto) : null,
+        contenido_unidad: form.contenido_neto ? form.contenido_unidad : null,
       };
-      // Save categoria_id directly
       if (form.categoria_id) {
         payload.categoria_id = form.categoria_id;
       } else {
@@ -123,7 +125,7 @@ export default function ProductosPage() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', categoria_id: p.categoria_id || '' });
+    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', categoria_id: p.categoria_id || '', contenido_neto: p.contenido_neto != null ? String(p.contenido_neto) : '', contenido_unidad: p.contenido_unidad || 'kg' });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
@@ -189,10 +191,10 @@ export default function ProductosPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[hsl(var(--surface-offset))]">
-                  {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Anterior', 'Var.', 'Última compra', 'Nº'].map(h => (
+                 <tr className="bg-[hsl(var(--surface-offset))]">
+                  {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Cont. Neto', 'Precio Real', 'Var.', 'Última compra', 'Nº'].map(h => (
                     <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
-                      ['Precio', 'Anterior', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
+                      ['Precio', 'Precio Real', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
                     }`}>{h}</th>
                   ))}
                   <th className="px-4 py-3"></th>
@@ -234,7 +236,14 @@ export default function ProductosPage() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{p.proveedor_nombre}</td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(actual)}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{anterior > 0 ? fmt(anterior) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {(p as any).contenido_neto ? `${(p as any).contenido_neto} ${(p as any).contenido_unidad || 'kg'}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                        {(p as any).contenido_neto && (p as any).contenido_neto > 0
+                          ? fmt(actual / Number((p as any).contenido_neto)) + '/' + ((p as any).contenido_unidad || 'kg')
+                          : '—'}
+                      </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${varClass}`}>{variacion}</td>
                       <td className="px-4 py-3 tabular-nums whitespace-nowrap">{p.ultima_compra || '—'}</td>
                       <td className="px-4 py-3 text-center tabular-nums">{p.num_compras}</td>
@@ -299,6 +308,38 @@ export default function ProductosPage() {
                 <Label className="text-sm font-semibold">Proveedor</Label>
                 <Input value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))} className="mt-1.5 bg-background" />
               </div>
+            </div>
+            {/* Contenido neto para escandallos */}
+            <div className="p-3 rounded-lg bg-muted/30 border space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">📦 Contenido neto (para escandallos)</p>
+              <p className="text-[11px] text-muted-foreground">Define cuánto producto real contiene la unidad comercial. Ej: una bolsa de lechuga = 1.6 kg</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Cantidad real</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ej: 1.6"
+                    value={form.contenido_neto}
+                    onChange={e => setForm(f => ({ ...f, contenido_neto: e.target.value }))}
+                    className="mt-1 bg-background h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Unidad real</Label>
+                  <Select value={form.contenido_unidad} onValueChange={v => setForm(f => ({ ...f, contenido_unidad: v }))}>
+                    <SelectTrigger className="mt-1 bg-background h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNIDADES_CONTENIDO.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {form.contenido_neto && parseFloat(form.contenido_neto) > 0 && (
+                <p className="text-xs font-medium text-primary">
+                  Precio real: {fmt(form.precio_actual / parseFloat(form.contenido_neto))}/{form.contenido_unidad}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
