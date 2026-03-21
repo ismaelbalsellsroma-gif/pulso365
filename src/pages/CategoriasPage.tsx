@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
-import { fetchCategorias } from '@/lib/queries';
+import { fetchCategorias, fetchProductos, fmt } from '@/lib/queries';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
