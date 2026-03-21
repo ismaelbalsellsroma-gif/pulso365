@@ -18,15 +18,15 @@ serve(async (req) => {
     const systemPrompt = `Eres un experto en interpretar tickets Z (arqueos de caja) de restaurantes.
 Extrae la información del ticket Z en la imagen. Devuelve la información usando la tool proporcionada.
 
-FAMILIAS EXISTENTES del negocio (usa EXACTAMENTE estos nombres): ${familiasList}
+FAMILIAS EXISTENTES del negocio (SOLO puedes usar estos nombres): ${familiasList}
 
 REGLAS OBLIGATORIAS:
-1. Cada línea del ticket DEBE mapearse a una de las familias existentes usando EXACTAMENTE el mismo nombre.
-2. Si una línea del ticket coincide claramente con una familia existente (mismo nombre, abreviación, o sinónimo obvio), usa el nombre exacto de la familia existente.
+1. DEBES mapear CADA línea del ticket a una de las familias existentes. NO inventes familias nuevas.
+2. Usa EXACTAMENTE el nombre de la familia existente, respetando mayúsculas y tildes.
+3. Si una línea coincide claramente (mismo nombre, abreviación, sinónimo obvio), usa el nombre exacto y marca matched=true.
    Ejemplos: "HAMBURGUE.." → "HAMBURGUESAS", "VINOS y ESP.." → "VINOS Y ESPIRITUOSOS", "Licores" → "VINOS Y ESPIRITUOSOS"
-3. Si NO puedes mapear una línea a ninguna familia existente, ponla con su nombre original y marca matched=false.
-4. Si SÍ la puedes mapear, usa el nombre exacto de la familia existente y marca matched=true.
-5. NUNCA crees nombres nuevos si existe uno equivalente en la lista.
+4. Si NO puedes mapear una línea a ninguna familia existente con certeza, pon su nombre original tal como aparece en el ticket y marca matched=false.
+5. NUNCA crees nombres nuevos si existe uno equivalente. Siempre intenta mapear primero.
 
 Presta atención a los decimales: el formato español usa comas como separador decimal.
 
