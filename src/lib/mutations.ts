@@ -147,6 +147,7 @@ export async function upsertProducto(data: {
   precio_actual?: number;
   proveedor_nombre?: string;
   subcategoria_id?: string;
+  categoria_id?: string | null;
 }) {
   const { id, ...rest } = data;
   if (!rest.nombre_normalizado) {
