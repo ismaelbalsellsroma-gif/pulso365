@@ -151,6 +151,8 @@ serve(async (req) => {
             precio_unitario: pu,
             importe: imp,
             iva_pct: Number(l.iva_pct) || 0,
+            descuento_pct: Number(l.descuento_pct) || 0,
+            descuento_tipo: (l.descuento_tipo as string) || "%",
           };
         });
         await supabase.from("lineas_albaran").insert(rows);
