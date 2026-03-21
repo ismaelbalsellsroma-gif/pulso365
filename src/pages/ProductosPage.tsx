@@ -309,6 +309,38 @@ export default function ProductosPage() {
                 <Input value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))} className="mt-1.5 bg-background" />
               </div>
             </div>
+            {/* Contenido neto para escandallos */}
+            <div className="p-3 rounded-lg bg-muted/30 border space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">📦 Contenido neto (para escandallos)</p>
+              <p className="text-[11px] text-muted-foreground">Define cuánto producto real contiene la unidad comercial. Ej: una bolsa de lechuga = 1.6 kg</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Cantidad real</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ej: 1.6"
+                    value={form.contenido_neto}
+                    onChange={e => setForm(f => ({ ...f, contenido_neto: e.target.value }))}
+                    className="mt-1 bg-background h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Unidad real</Label>
+                  <Select value={form.contenido_unidad} onValueChange={v => setForm(f => ({ ...f, contenido_unidad: v }))}>
+                    <SelectTrigger className="mt-1 bg-background h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNIDADES_CONTENIDO.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {form.contenido_neto && parseFloat(form.contenido_neto) > 0 && (
+                <p className="text-xs font-medium text-primary">
+                  Precio real: {fmt(form.precio_actual / parseFloat(form.contenido_neto))}/{form.contenido_unidad}
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
