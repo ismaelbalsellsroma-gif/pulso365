@@ -17,12 +17,26 @@ export default function DashboardPage() {
   const { data: suministros = [] } = useQuery({ queryKey: ['suministros'], queryFn: () => fetchSuministros() });
   const { data: arqueos = [] } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
 
+  // Proporción del día actual del mes (ej: día 15 de 30 = 0.5)
+  const now = new Date();
+  const diaActual = now.getDate();
+  const diasDelMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const proporcionMes = diaActual / diasDelMes;
+
   const ventas = arqueos.reduce((s, a) => s + Number(a.total_sin_iva || 0), 0);
   const comprasTotal = albaranes.reduce((s, a) => s + Number(a.importe || 0), 0);
-  const personalTotal = personal.filter(e => e.activo).reduce((s, e) => s + Number(e.coste_mensual || 0), 0);
-  const alquilerTotal = alquiler.filter(a => a.activo).reduce((s, a) => s + Number(a.importe_mensual || 0), 0);
-  const bancosTotal = bancos.filter(b => b.activo).reduce((s, b) => s + Number(b.importe_mensual || 0), 0);
-  const suministrosTotal = suministros.reduce((s, x) => s + Number(x.importe || 0), 0);
+
+  // Gastos fijos mensuales prorrateados al día actual
+  const personalMensual = personal.filter(e => e.activo).reduce((s, e) => s + Number(e.coste_mensual || 0), 0);
+  const alquilerMensual = alquiler.filter(a => a.activo).reduce((s, a) => s + Number(a.importe_mensual || 0), 0);
+  const bancosMensual = bancos.filter(b => b.activo).reduce((s, b) => s + Number(b.importe_mensual || 0), 0);
+  const suministrosMensual = suministros.reduce((s, x) => s + Number(x.importe || 0), 0);
+
+  const personalTotal = Math.round(personalMensual * proporcionMes * 100) / 100;
+  const alquilerTotal = Math.round(alquilerMensual * proporcionMes * 100) / 100;
+  const bancosTotal = Math.round(bancosMensual * proporcionMes * 100) / 100;
+  const suministrosTotal = Math.round(suministrosMensual * proporcionMes * 100) / 100;
+
   const resultado = ventas - comprasTotal - personalTotal - alquilerTotal - bancosTotal - suministrosTotal;
 
   const pct = (v: number) => ventas > 0 ? Math.round(v / ventas * 100) : 0;
