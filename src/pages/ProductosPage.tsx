@@ -191,10 +191,10 @@ export default function ProductosPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[hsl(var(--surface-offset))]">
-                  {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Anterior', 'Var.', 'Última compra', 'Nº'].map(h => (
+                 <tr className="bg-[hsl(var(--surface-offset))]">
+                  {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Cont. Neto', 'Precio Real', 'Var.', 'Última compra', 'Nº'].map(h => (
                     <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
-                      ['Precio', 'Anterior', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
+                      ['Precio', 'Precio Real', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
                     }`}>{h}</th>
                   ))}
                   <th className="px-4 py-3"></th>
