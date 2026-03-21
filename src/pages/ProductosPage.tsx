@@ -336,39 +336,87 @@ export default function ProductosPage() {
             {!newSubOpen ? (
               <>
                 {/* Category buttons grid */}
-                <div className="space-y-2">
-                  {categorias.map(cat => (
-                    <div key={cat.id}>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{cat.icon} {cat.nombre}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(cat.subcategorias || []).map((sub: any) => (
-                          <button
-                            key={sub.id}
-                            onClick={() => setSelectedSubcatId(sub.id)}
-                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 border ${
-                              selectedSubcatId === sub.id
-                                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                                : 'bg-muted/50 text-foreground border-transparent hover:bg-muted hover:border-border'
-                            }`}
-                          >
-                            {sub.nombre}
-                          </button>
-                        ))}
+                {categorias.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No hay categorías creadas. Crea una primero.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                    {categorias.map(cat => (
+                      <div key={cat.id}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{cat.icon} {cat.nombre}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(cat.subcategorias || []).map((sub: any) => (
+                            <button
+                              key={sub.id}
+                              onClick={() => setSelectedSubcatId(sub.id)}
+                              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 border ${
+                                selectedSubcatId === sub.id
+                                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                  : 'bg-muted/50 text-foreground border-transparent hover:bg-muted hover:border-border'
+                              }`}
+                            >
+                              {sub.nombre}
+                            </button>
+                          ))}
+                          {(cat.subcategorias || []).length === 0 && (
+                            <span className="text-[10px] text-muted-foreground italic">Sin subcategorías</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
-                {/* Create new subcategory button */}
-                <button
-                  onClick={() => { setNewSubOpen(true); setNewSubCatId(categorias[0]?.id || ''); }}
-                  className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-2"
-                >
-                  <FolderPlus className="h-3.5 w-3.5" /> Crear nueva subcategoría
-                </button>
+                {/* Action buttons */}
+                <div className="flex gap-3 pt-1 border-t">
+                  <button
+                    onClick={() => { setNewSubOpen(true); setNewCatMode(false); setNewSubCatId(categorias[0]?.id || ''); }}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <FolderPlus className="h-3.5 w-3.5" /> Nueva subcategoría
+                  </button>
+                  <button
+                    onClick={() => { setNewSubOpen(true); setNewCatMode(true); setNewCatName(''); setNewCatIcon('📦'); setNewCatTipo('otro'); }}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Nueva categoría
+                  </button>
+                </div>
               </>
+            ) : newCatMode ? (
+              /* Inline new CATEGORY form */
+              <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+                <p className="text-xs font-semibold">Nueva categoría</p>
+                <div>
+                  <Label className="text-xs">Nombre</Label>
+                  <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} className="mt-1 bg-background h-8 text-xs" placeholder="Ej: Pescado, Limpieza..." autoFocus />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Icono</Label>
+                    <Input value={newCatIcon} onChange={e => setNewCatIcon(e.target.value)} className="mt-1 bg-background h-8 text-xs text-center" maxLength={4} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={newCatTipo} onValueChange={setNewCatTipo}>
+                      <SelectTrigger className="mt-1 bg-background h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="comida">🍽️ Comida</SelectItem>
+                        <SelectItem value="bebida">🥤 Bebida</SelectItem>
+                        <SelectItem value="otro">📦 Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Después de crear la categoría podrás añadirle subcategorías.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setNewSubOpen(false); setNewCatMode(false); }}>Cancelar</Button>
+                  <Button size="sm" className="h-7 text-xs active:scale-95" onClick={() => createCatMut.mutate()} disabled={!newCatName.trim() || createCatMut.isPending}>
+                    {createCatMut.isPending ? 'Creando...' : 'Crear categoría'}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              /* Inline new subcategory form */
+              /* Inline new SUBCATEGORY form */
               <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
                 <p className="text-xs font-semibold">Nueva subcategoría</p>
                 <div>
@@ -391,7 +439,7 @@ export default function ProductosPage() {
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setNewSubOpen(false); setNewSubName(''); }}>Cancelar</Button>
                   <Button size="sm" className="h-7 text-xs active:scale-95" onClick={() => createSubMut.mutate()} disabled={!newSubName.trim() || !newSubCatId || createSubMut.isPending}>
-                    {createSubMut.isPending ? 'Creando...' : 'Crear'}
+                    {createSubMut.isPending ? 'Creando...' : 'Crear subcategoría'}
                   </Button>
                 </div>
               </div>
