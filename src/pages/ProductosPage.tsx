@@ -236,7 +236,14 @@ export default function ProductosPage() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{p.proveedor_nombre}</td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(actual)}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{anterior > 0 ? fmt(anterior) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {(p as any).contenido_neto ? `${(p as any).contenido_neto} ${(p as any).contenido_unidad || 'kg'}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                        {(p as any).contenido_neto && (p as any).contenido_neto > 0
+                          ? fmt(actual / Number((p as any).contenido_neto)) + '/' + ((p as any).contenido_unidad || 'kg')
+                          : '—'}
+                      </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${varClass}`}>{variacion}</td>
                       <td className="px-4 py-3 tabular-nums whitespace-nowrap">{p.ultima_compra || '—'}</td>
                       <td className="px-4 py-3 text-center tabular-nums">{p.num_compras}</td>
