@@ -2,8 +2,9 @@ import { useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Users, FolderOpen, Grid3x3, Tag, BookOpen,
   Package, Calculator, Receipt, Activity, Settings, UserCircle, Home,
-  CreditCard, Zap, Moon, Sun,
+  CreditCard, Zap, Moon, Sun, LogOut,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -39,6 +40,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { signOut, session } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -109,11 +111,18 @@ export function AppSidebar() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-xs font-medium">Mi Restaurante</span>
-              <span className="text-[10px] text-muted-foreground">Plan Básico</span>
+            <div className="flex flex-col flex-1">
+              <span className="text-xs font-medium truncate">{session?.user?.email}</span>
+              <span className="text-[10px] text-muted-foreground">Conectado</span>
             </div>
           )}
+          <button
+            onClick={signOut}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors active:scale-95"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>
