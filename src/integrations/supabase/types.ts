@@ -732,6 +732,7 @@ export type Database = {
       }
       productos: {
         Row: {
+          categoria_id: string | null
           contenido_neto: number | null
           contenido_unidad: string | null
           created_at: string
@@ -750,6 +751,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          categoria_id?: string | null
           contenido_neto?: number | null
           contenido_unidad?: string | null
           created_at?: string
@@ -768,6 +770,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          categoria_id?: string | null
           contenido_neto?: number | null
           contenido_unidad?: string | null
           created_at?: string
@@ -786,6 +789,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "productos_proveedor_id_fkey"
             columns: ["proveedor_id"]
