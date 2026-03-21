@@ -18,8 +18,6 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const body = await req.json();
-
-    // Accept single or array
     const items = Array.isArray(body) ? body : [body];
     const results: { id: string; numero: string }[] = [];
 
@@ -38,7 +36,6 @@ serve(async (req) => {
         notas,
         imagen_b64,
         procesado_en,
-        // Extra provider fields from scanning app
         proveedor_telefono,
         proveedor_email,
         proveedor_direccion,
@@ -61,7 +58,6 @@ serve(async (req) => {
           .ilike("nombre", `%${proveedor.split(" ")[0]}%`);
         if (provByName && provByName.length === 1) proveedor_id = provByName[0].id;
       }
-      // Auto-create provider if not found
       if (!proveedor_id && proveedor) {
         const { data: newProv } = await supabase
           .from("proveedores")
@@ -125,42 +121,127 @@ serve(async (req) => {
         continue;
       }
 
-      // 4. Insert line items
+      // 4. Insert line items & update product prices
       if (lineas.length > 0 && albaran) {
-        const rows = lineas.map(
-          (l: Record<string, unknown>) => {
-            let pu = Number(l.precio_unitario) || 0;
-            const cant = Number(l.cantidad) || 1;
-            const imp = Number(l.importe) || 0;
+        const albaranFecha = fecha || new Date().toISOString().slice(0, 10);
 
-            // Detect precio_unitario in thousandths (milésimas):
-            // If pu > 100 and dividing by 1000 gives a value close to importe/cantidad, normalize
-            if (pu > 100) {
-              const puNorm = pu / 1000;
-              const expectedFromImp = cant > 0 ? imp / cant : 0;
-              // If ÷1000 is within 15% of importe/cantidad, use normalized value
-              if (expectedFromImp > 0 && Math.abs(puNorm - expectedFromImp) / expectedFromImp < 0.15) {
-                pu = puNorm;
-              } else if (expectedFromImp > 0) {
-                // Fallback: derive from importe / cantidad (most reliable)
-                pu = Math.round(expectedFromImp * 10000) / 10000;
-              } else {
-                pu = puNorm; // Default: assume thousandths
-              }
+        const rows = lineas.map((l: Record<string, unknown>) => {
+          let pu = Number(l.precio_unitario) || 0;
+          const cant = Number(l.cantidad) || 1;
+          const imp = Number(l.importe) || 0;
+
+          // Detect precio_unitario in thousandths (milésimas)
+          if (pu > 100) {
+            const puNorm = pu / 1000;
+            const expectedFromImp = cant > 0 ? imp / cant : 0;
+            if (expectedFromImp > 0 && Math.abs(puNorm - expectedFromImp) / expectedFromImp < 0.15) {
+              pu = puNorm;
+            } else if (expectedFromImp > 0) {
+              pu = Math.round(expectedFromImp * 10000) / 10000;
+            } else {
+              pu = puNorm;
             }
-
-            return {
-              albaran_id: albaran.id,
-              codigo: (l.referencia as string) || "",
-              descripcion: (l.descripcion as string) || "",
-              cantidad: cant,
-              precio_unitario: pu,
-              importe: imp,
-              iva_pct: Number(l.iva_pct) || 0,
-            };
           }
-        );
+
+          return {
+            albaran_id: albaran.id,
+            codigo: (l.referencia as string) || "",
+            descripcion: (l.descripcion as string) || "",
+            cantidad: cant,
+            precio_unitario: pu,
+            importe: imp,
+            iva_pct: Number(l.iva_pct) || 0,
+          };
+        });
         await supabase.from("lineas_albaran").insert(rows);
+
+        // 5. Auto-update product prices from lines
+        for (const row of rows) {
+          if (!row.descripcion) continue;
+          const nombreNorm = row.descripcion.toLowerCase().trim();
+
+          // Try to find existing product by normalized name
+          const { data: existingProd } = await supabase
+            .from("productos")
+            .select("id, precio_actual, num_compras")
+            .eq("nombre_normalizado", nombreNorm)
+            .maybeSingle();
+
+          if (existingProd) {
+            // Update existing product price
+            const oldPrice = Number(existingProd.precio_actual) || 0;
+            const newPrice = row.precio_unitario;
+            const numCompras = (Number(existingProd.num_compras) || 0) + 1;
+
+            await supabase
+              .from("productos")
+              .update({
+                precio_anterior: oldPrice,
+                precio_actual: newPrice,
+                ultima_compra: albaranFecha,
+                num_compras: numCompras,
+                proveedor_id: proveedor_id,
+                proveedor_nombre: proveedor || "",
+              })
+              .eq("id", existingProd.id);
+
+            // Insert price history
+            await supabase.from("precios_historico").insert({
+              producto_id: existingProd.id,
+              precio: newPrice,
+              fecha: albaranFecha,
+              albaran_id: albaran.id,
+              proveedor_id: proveedor_id,
+              proveedor_nombre: proveedor || "",
+              cantidad: row.cantidad,
+            });
+
+            // Create price alert if significant change
+            if (oldPrice > 0 && Math.abs(newPrice - oldPrice) / oldPrice > 0.05) {
+              const variacion = ((newPrice - oldPrice) / oldPrice) * 100;
+              await supabase.from("alertas_precio").insert({
+                producto_id: existingProd.id,
+                precio_anterior: oldPrice,
+                precio_nuevo: newPrice,
+                variacion_pct: Math.round(variacion * 10) / 10,
+                albaran_id: albaran.id,
+                fecha: albaranFecha,
+                tipo: variacion > 0 ? "subida" : "bajada",
+                mensaje: `${row.descripcion}: ${variacion > 0 ? "+" : ""}${variacion.toFixed(1)}% (${oldPrice.toFixed(2)}€ → ${newPrice.toFixed(2)}€)`,
+              });
+            }
+          } else {
+            // Create new product
+            const { data: newProd } = await supabase
+              .from("productos")
+              .insert({
+                nombre: row.descripcion,
+                nombre_normalizado: nombreNorm,
+                referencia: row.codigo || "",
+                precio_actual: row.precio_unitario,
+                precio_anterior: 0,
+                ultima_compra: albaranFecha,
+                num_compras: 1,
+                proveedor_id: proveedor_id,
+                proveedor_nombre: proveedor || "",
+                unidad: "ud",
+              })
+              .select("id")
+              .single();
+
+            if (newProd) {
+              await supabase.from("precios_historico").insert({
+                producto_id: newProd.id,
+                precio: row.precio_unitario,
+                fecha: albaranFecha,
+                albaran_id: albaran.id,
+                proveedor_id: proveedor_id,
+                proveedor_nombre: proveedor || "",
+                cantidad: row.cantidad,
+              });
+            }
+          }
+        }
       }
 
       results.push({ id: albaran!.id, numero: numero_albaran || "" });

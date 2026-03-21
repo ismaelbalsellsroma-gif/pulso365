@@ -4,17 +4,19 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
-import { fetchProductos, fmt } from '@/lib/queries';
+import { fetchProductos, fetchCategorias, fmt } from '@/lib/queries';
 import { upsertProducto, deleteProducto } from '@/lib/mutations';
 import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '' };
+const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', subcategoria_id: '' };
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('todas');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -23,14 +25,33 @@ export default function ProductosPage() {
 
   const qc = useQueryClient();
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
-  const filtered = productos.filter(p =>
-    !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.referencia || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
+
+  // Build subcategoria -> categoria name map
+  const subToCategoria: Record<string, string> = {};
+  const allSubs: { id: string; nombre: string; categoria_nombre: string }[] = [];
+  for (const cat of categorias) {
+    for (const sub of (cat.subcategorias || [])) {
+      subToCategoria[sub.id] = cat.nombre;
+      allSubs.push({ id: sub.id, nombre: sub.nombre, categoria_nombre: cat.nombre });
+    }
+  }
+
+  const filtered = productos.filter(p => {
+    const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.referencia || '').toLowerCase().includes(search.toLowerCase());
+    const matchCat = catFilter === 'todas' || (p.subcategoria_id && subToCategoria[p.subcategoria_id] === catFilter);
+    return matchSearch && matchCat;
+  });
 
   const conCambio = productos.filter(p => p.precio_anterior && Math.abs(Number(p.precio_actual) - Number(p.precio_anterior)) > 0.001).length;
 
   const saveMut = useMutation({
-    mutationFn: () => upsertProducto({ id: editId || undefined, ...form, precio_actual: Number(form.precio_actual) }),
+    mutationFn: () => upsertProducto({
+      id: editId || undefined,
+      ...form,
+      precio_actual: Number(form.precio_actual),
+      subcategoria_id: form.subcategoria_id || undefined,
+    }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['productos'] }); setDialogOpen(false); toast.success(editId ? 'Producto actualizado' : 'Producto creado'); },
     onError: () => toast.error('Error guardando producto'),
   });
@@ -44,10 +65,12 @@ export default function ProductosPage() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '' });
+    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', subcategoria_id: p.subcategoria_id || '' });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
+
+  const uniqueCatNames = [...new Set(categorias.map(c => c.nombre))];
 
   return (
     <div className="space-y-5">
@@ -65,14 +88,27 @@ export default function ProductosPage() {
           <div className="panel-card-value text-2xl">{conCambio}</div>
         </div>
         <div className="panel-card">
-          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>Alertas pendientes</span></div>
-          <div className="panel-card-value text-2xl" style={{ color: 'hsl(var(--warning))' }}>0</div>
+          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>Sin categoría</span></div>
+          <div className="panel-card-value text-2xl" style={{ color: 'hsl(var(--warning))' }}>
+            {productos.filter(p => !p.subcategoria_id).length}
+          </div>
         </div>
       </div>
 
-      <div className="relative max-w-md animate-fade-in-up animate-delay-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar producto o referencia..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card" />
+      <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up animate-delay-1">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar producto o referencia..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card" />
+        </div>
+        <Select value={catFilter} onValueChange={setCatFilter}>
+          <SelectTrigger className="w-[180px] bg-card">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las categorías</SelectItem>
+            {uniqueCatNames.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -85,7 +121,7 @@ export default function ProductosPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[hsl(var(--surface-offset))]">
-                  {['Ref', 'Producto', 'Proveedor', 'Precio', 'Anterior', 'Var.', 'Última compra', 'Nº'].map(h => (
+                  {['Ref', 'Producto', 'Categoría', 'Proveedor', 'Precio', 'Anterior', 'Var.', 'Última compra', 'Nº'].map(h => (
                     <th key={h} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${
                       ['Precio', 'Anterior', 'Var.'].includes(h) ? 'text-right' : h === 'Nº' ? 'text-center' : 'text-left'
                     }`}>{h}</th>
@@ -104,10 +140,12 @@ export default function ProductosPage() {
                     variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
                     varClass = pct > 0 ? 'text-[hsl(var(--error))] font-semibold' : 'text-[hsl(var(--success))] font-semibold';
                   }
+                  const catName = p.subcategoria_id ? subToCategoria[p.subcategoria_id] || '—' : '—';
                   return (
                     <tr key={p.id} className="border-t border-[hsl(var(--divider))] hover:bg-[hsl(var(--surface-offset))] transition-colors group cursor-pointer">
                       <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</td>
                       <td className="px-4 py-3 font-medium">{p.nombre}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{catName}</td>
                       <td className="px-4 py-3 text-muted-foreground">{p.proveedor_nombre}</td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(actual)}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{anterior > 0 ? fmt(anterior) : '—'}</td>
@@ -148,6 +186,24 @@ export default function ProductosPage() {
                 <Label className="text-sm font-semibold">Unidad</Label>
                 <Input value={form.unidad} onChange={e => setForm(f => ({ ...f, unidad: e.target.value }))} className="mt-1.5 bg-background" placeholder="ud, kg, l..." />
               </div>
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Subcategoría</Label>
+              <Select value={form.subcategoria_id} onValueChange={v => setForm(f => ({ ...f, subcategoria_id: v }))}>
+                <SelectTrigger className="mt-1.5 bg-background">
+                  <SelectValue placeholder="Selecciona subcategoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin categoría</SelectItem>
+                  {categorias.map(cat => (
+                    (cat.subcategorias || []).map((sub: any) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {cat.icon} {cat.nombre} → {sub.nombre}
+                      </SelectItem>
+                    ))
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
