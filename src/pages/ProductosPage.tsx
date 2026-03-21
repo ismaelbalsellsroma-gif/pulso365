@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
+import { supabase } from '@/integrations/supabase/client';
 import { fetchProductos, fetchCategorias, fmt } from '@/lib/queries';
 import { upsertProducto, deleteProducto } from '@/lib/mutations';
-import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', subcategoria_id: '' };
@@ -23,26 +24,40 @@ export default function ProductosPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
+  // Quick category assignment
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [catProductId, setCatProductId] = useState<string | null>(null);
+  const [catProductName, setCatProductName] = useState('');
+  const [selectedSubcatId, setSelectedSubcatId] = useState('');
+
+  // Inline new subcategory creation
+  const [newSubOpen, setNewSubOpen] = useState(false);
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubCatId, setNewSubCatId] = useState('');
+
   const qc = useQueryClient();
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
 
   // Build subcategoria -> categoria name map
   const subToCategoria: Record<string, string> = {};
-  const allSubs: { id: string; nombre: string; categoria_nombre: string }[] = [];
+  const allSubs: { id: string; nombre: string; categoria_nombre: string; cat_icon: string }[] = [];
   for (const cat of categorias) {
     for (const sub of (cat.subcategorias || [])) {
       subToCategoria[sub.id] = cat.nombre;
-      allSubs.push({ id: sub.id, nombre: sub.nombre, categoria_nombre: cat.nombre });
+      allSubs.push({ id: sub.id, nombre: sub.nombre, categoria_nombre: cat.nombre, cat_icon: cat.icon || '📦' });
     }
   }
 
   const filtered = productos.filter(p => {
     const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.referencia || '').toLowerCase().includes(search.toLowerCase());
-    const matchCat = catFilter === 'todas' || (p.subcategoria_id && subToCategoria[p.subcategoria_id] === catFilter);
+    const matchCat = catFilter === 'todas' || catFilter === 'sin_categoria'
+      ? (catFilter === 'sin_categoria' ? !p.subcategoria_id : true)
+      : (p.subcategoria_id && subToCategoria[p.subcategoria_id] === catFilter);
     return matchSearch && matchCat;
   });
 
+  const sinCategoria = productos.filter(p => !p.subcategoria_id);
   const conCambio = productos.filter(p => p.precio_anterior && Math.abs(Number(p.precio_actual) - Number(p.precio_anterior)) > 0.001).length;
 
   const saveMut = useMutation({
@@ -62,6 +77,39 @@ export default function ProductosPage() {
     onError: () => toast.error('Error eliminando producto'),
   });
 
+  // Quick category assignment mutation
+  const assignCatMut = useMutation({
+    mutationFn: async () => {
+      if (!catProductId || !selectedSubcatId) return;
+      const { error } = await supabase.from('productos').update({ subcategoria_id: selectedSubcatId }).eq('id', catProductId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['productos'] });
+      setCatDialogOpen(false);
+      toast.success('Categoría asignada');
+    },
+    onError: () => toast.error('Error asignando categoría'),
+  });
+
+  // Create new subcategory inline
+  const createSubMut = useMutation({
+    mutationFn: async () => {
+      if (!newSubName.trim() || !newSubCatId) return;
+      const { data, error } = await supabase.from('subcategorias').insert({ nombre: newSubName.trim(), categoria_id: newSubCatId }).select('id').single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['categorias'] });
+      if (data) setSelectedSubcatId(data.id);
+      setNewSubOpen(false);
+      setNewSubName('');
+      toast.success('Subcategoría creada');
+    },
+    onError: () => toast.error('Error creando subcategoría'),
+  });
+
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
@@ -69,6 +117,15 @@ export default function ProductosPage() {
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
+
+  // Quick category dialog
+  const openQuickCat = (e: React.MouseEvent, p: any) => {
+    e.stopPropagation();
+    setCatProductId(p.id);
+    setCatProductName(p.nombre);
+    setSelectedSubcatId(p.subcategoria_id || '');
+    setCatDialogOpen(true);
+  };
 
   const uniqueCatNames = [...new Set(categorias.map(c => c.nombre))];
 
@@ -87,11 +144,9 @@ export default function ProductosPage() {
           <div className="panel-card-header"><TrendingUp className="h-4 w-4" /><span>Con cambio precio</span></div>
           <div className="panel-card-value text-2xl">{conCambio}</div>
         </div>
-        <div className="panel-card">
-          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>Sin categoría</span></div>
-          <div className="panel-card-value text-2xl" style={{ color: 'hsl(var(--warning))' }}>
-            {productos.filter(p => !p.subcategoria_id).length}
-          </div>
+        <div className="panel-card cursor-pointer hover:ring-2 hover:ring-amber-400/50 transition-all active:scale-[0.98]" onClick={() => setCatFilter(catFilter === 'sin_categoria' ? 'todas' : 'sin_categoria')}>
+          <div className="panel-card-header"><AlertTriangle className="h-4 w-4 text-amber-500" /><span>Sin categoría</span></div>
+          <div className="panel-card-value text-2xl text-amber-500 font-bold">{sinCategoria.length}</div>
         </div>
       </div>
 
@@ -101,11 +156,14 @@ export default function ProductosPage() {
           <Input placeholder="Buscar producto o referencia..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card" />
         </div>
         <Select value={catFilter} onValueChange={setCatFilter}>
-          <SelectTrigger className="w-[180px] bg-card">
+          <SelectTrigger className="w-[200px] bg-card">
             <SelectValue placeholder="Categoría" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las categorías</SelectItem>
+            <SelectItem value="sin_categoria">
+              <span className="text-amber-500 font-semibold">⚠ Sin categoría ({sinCategoria.length})</span>
+            </SelectItem>
             {uniqueCatNames.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -133,6 +191,7 @@ export default function ProductosPage() {
                 {filtered.map(p => {
                   const actual = Number(p.precio_actual);
                   const anterior = Number(p.precio_anterior);
+                  const noCat = !p.subcategoria_id;
                   let variacion = '—';
                   let varClass = '';
                   if (anterior > 0 && Math.abs(actual - anterior) > 0.001) {
@@ -140,12 +199,27 @@ export default function ProductosPage() {
                     variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
                     varClass = pct > 0 ? 'text-[hsl(var(--error))] font-semibold' : 'text-[hsl(var(--success))] font-semibold';
                   }
-                  const catName = p.subcategoria_id ? subToCategoria[p.subcategoria_id] || '—' : '—';
+                  const catName = p.subcategoria_id ? subToCategoria[p.subcategoria_id] || '—' : null;
                   return (
-                    <tr key={p.id} className="border-t border-[hsl(var(--divider))] hover:bg-[hsl(var(--surface-offset))] transition-colors group cursor-pointer">
+                    <tr
+                      key={p.id}
+                      className={`border-t border-[hsl(var(--divider))] hover:bg-[hsl(var(--surface-offset))] transition-colors group cursor-pointer ${noCat ? 'bg-amber-500/[0.06]' : ''}`}
+                      onClick={() => openEdit(p)}
+                    >
                       <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</td>
                       <td className="px-4 py-3 font-medium">{p.nombre}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{catName}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {catName ? (
+                          <span className="text-muted-foreground">{catName}</span>
+                        ) : (
+                          <button
+                            onClick={e => openQuickCat(e, p)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 border border-amber-500/25 text-[11px] font-semibold hover:bg-amber-500/25 transition-colors active:scale-95"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Asignar
+                          </button>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{p.proveedor_nombre}</td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(actual)}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{anterior > 0 ? fmt(anterior) : '—'}</td>
@@ -153,7 +227,7 @@ export default function ProductosPage() {
                       <td className="px-4 py-3 tabular-nums whitespace-nowrap">{p.ultima_compra || '—'}</td>
                       <td className="px-4 py-3 text-center tabular-nums">{p.num_compras}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                           <button onClick={() => openEdit(p)} className="p-1.5 rounded-md text-muted-foreground hover:text-primary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
                           <button onClick={() => openDelete(p.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                         </div>
@@ -167,6 +241,7 @@ export default function ProductosPage() {
         </div>
       )}
 
+      {/* Edit / New product dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -189,12 +264,12 @@ export default function ProductosPage() {
             </div>
             <div>
               <Label className="text-sm font-semibold">Subcategoría</Label>
-              <Select value={form.subcategoria_id} onValueChange={v => setForm(f => ({ ...f, subcategoria_id: v }))}>
+              <Select value={form.subcategoria_id || 'none'} onValueChange={v => setForm(f => ({ ...f, subcategoria_id: v === 'none' ? '' : v }))}>
                 <SelectTrigger className="mt-1.5 bg-background">
                   <SelectValue placeholder="Selecciona subcategoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin categoría</SelectItem>
+                  <SelectItem value="none">Sin categoría</SelectItem>
                   {categorias.map(cat => (
                     (cat.subcategorias || []).map((sub: any) => (
                       <SelectItem key={sub.id} value={sub.id}>
@@ -220,6 +295,91 @@ export default function ProductosPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={() => saveMut.mutate()} disabled={!form.nombre.trim() || saveMut.isPending} className="active:scale-95">
               {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick category assignment dialog */}
+      <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Asignar categoría</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1 truncate">{catProductName}</p>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {!newSubOpen ? (
+              <>
+                {/* Category buttons grid */}
+                <div className="space-y-2">
+                  {categorias.map(cat => (
+                    <div key={cat.id}>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{cat.icon} {cat.nombre}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(cat.subcategorias || []).map((sub: any) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => setSelectedSubcatId(sub.id)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 border ${
+                              selectedSubcatId === sub.id
+                                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                : 'bg-muted/50 text-foreground border-transparent hover:bg-muted hover:border-border'
+                            }`}
+                          >
+                            {sub.nombre}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Create new subcategory button */}
+                <button
+                  onClick={() => { setNewSubOpen(true); setNewSubCatId(categorias[0]?.id || ''); }}
+                  className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-2"
+                >
+                  <FolderPlus className="h-3.5 w-3.5" /> Crear nueva subcategoría
+                </button>
+              </>
+            ) : (
+              /* Inline new subcategory form */
+              <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+                <p className="text-xs font-semibold">Nueva subcategoría</p>
+                <div>
+                  <Label className="text-xs">Categoría padre</Label>
+                  <Select value={newSubCatId} onValueChange={setNewSubCatId}>
+                    <SelectTrigger className="mt-1 bg-background h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Nombre</Label>
+                  <Input value={newSubName} onChange={e => setNewSubName(e.target.value)} className="mt-1 bg-background h-8 text-xs" placeholder="Ej: Carnes, Refrescos..." autoFocus />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setNewSubOpen(false); setNewSubName(''); }}>Cancelar</Button>
+                  <Button size="sm" className="h-7 text-xs active:scale-95" onClick={() => createSubMut.mutate()} disabled={!newSubName.trim() || !newSubCatId || createSubMut.isPending}>
+                    {createSubMut.isPending ? 'Creando...' : 'Crear'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => assignCatMut.mutate()}
+              disabled={!selectedSubcatId || assignCatMut.isPending}
+              className="active:scale-95"
+            >
+              {assignCatMut.isPending ? 'Guardando...' : 'Asignar'}
             </Button>
           </DialogFooter>
         </DialogContent>
