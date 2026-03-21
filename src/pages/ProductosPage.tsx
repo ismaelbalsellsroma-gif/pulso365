@@ -1,12 +1,27 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchProductos, fmt } from '@/lib/queries';
-import { Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2 } from 'lucide-react';
+import { upsertProducto, deleteProducto } from '@/lib/mutations';
+import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '' };
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const qc = useQueryClient();
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
   const filtered = productos.filter(p =>
     !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.referencia || '').toLowerCase().includes(search.toLowerCase())
@@ -14,9 +29,31 @@ export default function ProductosPage() {
 
   const conCambio = productos.filter(p => p.precio_anterior && Math.abs(Number(p.precio_actual) - Number(p.precio_anterior)) > 0.001).length;
 
+  const saveMut = useMutation({
+    mutationFn: () => upsertProducto({ id: editId || undefined, ...form, precio_actual: Number(form.precio_actual) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['productos'] }); setDialogOpen(false); toast.success(editId ? 'Producto actualizado' : 'Producto creado'); },
+    onError: () => toast.error('Error guardando producto'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: () => deleteProducto(deleteId!),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['productos'] }); setDeleteOpen(false); toast.success('Producto eliminado'); },
+    onError: () => toast.error('Error eliminando producto'),
+  });
+
+  const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (p: any) => {
+    setEditId(p.id);
+    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '' });
+    setDialogOpen(true);
+  };
+  const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
+
   return (
     <div className="space-y-5">
-      <PageHeader title="Productos" description="Catálogo de productos creados automáticamente desde albaranes" />
+      <PageHeader title="Productos" description="Catálogo de productos creados automáticamente desde albaranes">
+        <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo Producto</Button>
+      </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-up">
         <div className="panel-card">
@@ -40,6 +77,8 @@ export default function ProductosPage() {
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground p-8 text-center">Cargando productos...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-sm text-muted-foreground p-8 text-center">No hay productos.</div>
       ) : (
         <div className="bg-card border rounded-lg overflow-hidden animate-fade-in-up animate-delay-2">
           <div className="overflow-x-auto">
@@ -77,8 +116,8 @@ export default function ProductosPage() {
                       <td className="px-4 py-3 text-center tabular-nums">{p.num_compras}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-1.5 rounded-md text-muted-foreground hover:text-primary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => openEdit(p)} className="p-1.5 rounded-md text-muted-foreground hover:text-primary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => openDelete(p.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                         </div>
                       </td>
                     </tr>
@@ -89,6 +128,48 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold">Nombre *</Label>
+              <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} className="mt-1.5 bg-background" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-semibold">Referencia</Label>
+                <Input value={form.referencia} onChange={e => setForm(f => ({ ...f, referencia: e.target.value }))} className="mt-1.5 bg-background" />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Unidad</Label>
+                <Input value={form.unidad} onChange={e => setForm(f => ({ ...f, unidad: e.target.value }))} className="mt-1.5 bg-background" placeholder="ud, kg, l..." />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-semibold">Precio actual (€)</Label>
+                <Input type="number" step="0.01" value={form.precio_actual} onChange={e => setForm(f => ({ ...f, precio_actual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Proveedor</Label>
+                <Input value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))} className="mt-1.5 bg-background" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => saveMut.mutate()} disabled={!form.nombre.trim() || saveMut.isPending} className="active:scale-95">
+              {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={() => delMut.mutate()} isPending={delMut.isPending} title="¿Eliminar producto?" description="Se eliminará el producto y su historial de precios." />
     </div>
   );
 }
