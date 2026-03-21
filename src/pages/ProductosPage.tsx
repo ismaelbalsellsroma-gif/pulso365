@@ -13,7 +13,7 @@ import { upsertProducto, deleteProducto } from '@/lib/mutations';
 import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', subcategoria_id: '' };
+const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '' };
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
@@ -28,13 +28,9 @@ export default function ProductosPage() {
   const [catDialogOpen, setCatDialogOpen] = useState(false);
   const [catProductId, setCatProductId] = useState<string | null>(null);
   const [catProductName, setCatProductName] = useState('');
-  const [selectedSubcatId, setSelectedSubcatId] = useState('');
+  const [selectedCatId, setSelectedCatId] = useState('');
 
-  // Inline new subcategory/category creation
-  const [newSubOpen, setNewSubOpen] = useState(false);
-  const [newSubName, setNewSubName] = useState('');
-  const [newSubCatId, setNewSubCatId] = useState('');
-  // Create new category inline
+  // Inline new category creation
   const [newCatMode, setNewCatMode] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('📦');
@@ -44,34 +40,41 @@ export default function ProductosPage() {
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
 
-  // Build subcategoria -> categoria name map
-  const subToCategoria: Record<string, string> = {};
-  const allSubs: { id: string; nombre: string; categoria_nombre: string; cat_icon: string }[] = [];
+  // Build categoria id -> name map
+  const catMap: Record<string, { nombre: string; icon: string }> = {};
   for (const cat of categorias) {
-    for (const sub of (cat.subcategorias || [])) {
-      subToCategoria[sub.id] = cat.nombre;
-      allSubs.push({ id: sub.id, nombre: sub.nombre, categoria_nombre: cat.nombre, cat_icon: cat.icon || '📦' });
-    }
+    catMap[cat.id] = { nombre: cat.nombre, icon: cat.icon || '📦' };
   }
 
   const filtered = productos.filter(p => {
     const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.referencia || '').toLowerCase().includes(search.toLowerCase());
     const matchCat = catFilter === 'todas' || catFilter === 'sin_categoria'
-      ? (catFilter === 'sin_categoria' ? !p.subcategoria_id : true)
-      : (p.subcategoria_id && subToCategoria[p.subcategoria_id] === catFilter);
+      ? (catFilter === 'sin_categoria' ? !(p as any).categoria_id : true)
+      : ((p as any).categoria_id && catMap[(p as any).categoria_id]?.nombre === catFilter);
     return matchSearch && matchCat;
   });
 
-  const sinCategoria = productos.filter(p => !p.subcategoria_id);
+  const sinCategoria = productos.filter(p => !(p as any).categoria_id);
   const conCambio = productos.filter(p => p.precio_anterior && Math.abs(Number(p.precio_actual) - Number(p.precio_anterior)) > 0.001).length;
 
   const saveMut = useMutation({
-    mutationFn: () => upsertProducto({
-      id: editId || undefined,
-      ...form,
-      precio_actual: Number(form.precio_actual),
-      subcategoria_id: form.subcategoria_id || undefined,
-    }),
+    mutationFn: async () => {
+      const payload: any = {
+        id: editId || undefined,
+        nombre: form.nombre,
+        referencia: form.referencia,
+        unidad: form.unidad,
+        precio_actual: Number(form.precio_actual),
+        proveedor_nombre: form.proveedor_nombre,
+      };
+      // Save categoria_id directly
+      if (form.categoria_id) {
+        payload.categoria_id = form.categoria_id;
+      } else {
+        payload.categoria_id = null;
+      }
+      await upsertProducto(payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['productos'] }); setDialogOpen(false); toast.success(editId ? 'Producto actualizado' : 'Producto creado'); },
     onError: () => toast.error('Error guardando producto'),
   });
@@ -85,8 +88,8 @@ export default function ProductosPage() {
   // Quick category assignment mutation
   const assignCatMut = useMutation({
     mutationFn: async () => {
-      if (!catProductId || !selectedSubcatId) return;
-      const { error } = await supabase.from('productos').update({ subcategoria_id: selectedSubcatId }).eq('id', catProductId);
+      if (!catProductId || !selectedCatId) return;
+      const { error } = await supabase.from('productos').update({ categoria_id: selectedCatId } as any).eq('id', catProductId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -108,7 +111,7 @@ export default function ProductosPage() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['categorias'] });
       if (data) {
-        setNewSubCatId(data.id);
+        setSelectedCatId(data.id);
         setNewCatMode(false);
         setNewCatName('');
       }
@@ -117,28 +120,10 @@ export default function ProductosPage() {
     onError: () => toast.error('Error creando categoría'),
   });
 
-  // Create new subcategory inline
-  const createSubMut = useMutation({
-    mutationFn: async () => {
-      if (!newSubName.trim() || !newSubCatId) return;
-      const { data, error } = await supabase.from('subcategorias').insert({ nombre: newSubName.trim(), categoria_id: newSubCatId }).select('id').single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['categorias'] });
-      if (data) setSelectedSubcatId(data.id);
-      setNewSubOpen(false);
-      setNewSubName('');
-      toast.success('Subcategoría creada');
-    },
-    onError: () => toast.error('Error creando subcategoría'),
-  });
-
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', subcategoria_id: p.subcategoria_id || '' });
+    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', categoria_id: p.categoria_id || '' });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
@@ -148,7 +133,8 @@ export default function ProductosPage() {
     e.stopPropagation();
     setCatProductId(p.id);
     setCatProductName(p.nombre);
-    setSelectedSubcatId(p.subcategoria_id || '');
+    setSelectedCatId(p.categoria_id || '');
+    setNewCatMode(false);
     setCatDialogOpen(true);
   };
 
@@ -216,7 +202,8 @@ export default function ProductosPage() {
                 {filtered.map(p => {
                   const actual = Number(p.precio_actual);
                   const anterior = Number(p.precio_anterior);
-                  const noCat = !p.subcategoria_id;
+                  const pCatId = (p as any).categoria_id;
+                  const noCat = !pCatId;
                   let variacion = '—';
                   let varClass = '';
                   if (anterior > 0 && Math.abs(actual - anterior) > 0.001) {
@@ -224,7 +211,7 @@ export default function ProductosPage() {
                     variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
                     varClass = pct > 0 ? 'text-[hsl(var(--error))] font-semibold' : 'text-[hsl(var(--success))] font-semibold';
                   }
-                  const catName = p.subcategoria_id ? subToCategoria[p.subcategoria_id] || '—' : null;
+                  const catInfo = pCatId ? catMap[pCatId] : null;
                   return (
                     <tr
                       key={p.id}
@@ -234,8 +221,8 @@ export default function ProductosPage() {
                       <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</td>
                       <td className="px-4 py-3 font-medium">{p.nombre}</td>
                       <td className="px-4 py-3 text-xs">
-                        {catName ? (
-                          <span className="text-muted-foreground">{catName}</span>
+                        {catInfo ? (
+                          <span className="text-muted-foreground">{catInfo.icon} {catInfo.nombre}</span>
                         ) : (
                           <button
                             onClick={e => openQuickCat(e, p)}
@@ -288,19 +275,17 @@ export default function ProductosPage() {
               </div>
             </div>
             <div>
-              <Label className="text-sm font-semibold">Subcategoría</Label>
-              <Select value={form.subcategoria_id || 'none'} onValueChange={v => setForm(f => ({ ...f, subcategoria_id: v === 'none' ? '' : v }))}>
+              <Label className="text-sm font-semibold">Categoría</Label>
+              <Select value={form.categoria_id || 'none'} onValueChange={v => setForm(f => ({ ...f, categoria_id: v === 'none' ? '' : v }))}>
                 <SelectTrigger className="mt-1.5 bg-background">
-                  <SelectValue placeholder="Selecciona subcategoría" />
+                  <SelectValue placeholder="Selecciona categoría" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin categoría</SelectItem>
                   {categorias.map(cat => (
-                    (cat.subcategorias || []).map((sub: any) => (
-                      <SelectItem key={sub.id} value={sub.id}>
-                        {cat.icon} {cat.nombre} → {sub.nombre}
-                      </SelectItem>
-                    ))
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.nombre}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -333,56 +318,38 @@ export default function ProductosPage() {
             <p className="text-sm text-muted-foreground mt-1 truncate">{catProductName}</p>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {!newSubOpen ? (
+            {!newCatMode ? (
               <>
-                {/* Category buttons grid */}
                 {categorias.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">No hay categorías creadas. Crea una primero.</p>
                 ) : (
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                  <div className="flex flex-wrap gap-2 max-h-[250px] overflow-y-auto">
                     {categorias.map(cat => (
-                      <div key={cat.id}>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{cat.icon} {cat.nombre}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(cat.subcategorias || []).map((sub: any) => (
-                            <button
-                              key={sub.id}
-                              onClick={() => setSelectedSubcatId(sub.id)}
-                              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 border ${
-                                selectedSubcatId === sub.id
-                                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                                  : 'bg-muted/50 text-foreground border-transparent hover:bg-muted hover:border-border'
-                              }`}
-                            >
-                              {sub.nombre}
-                            </button>
-                          ))}
-                          {(cat.subcategorias || []).length === 0 && (
-                            <span className="text-[10px] text-muted-foreground italic">Sin subcategorías</span>
-                          )}
-                        </div>
-                      </div>
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCatId(cat.id)}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all active:scale-95 border ${
+                          selectedCatId === cat.id
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'bg-muted/50 text-foreground border-transparent hover:bg-muted hover:border-border'
+                        }`}
+                      >
+                        {cat.icon} {cat.nombre}
+                      </button>
                     ))}
                   </div>
                 )}
 
-                {/* Action buttons */}
-                <div className="flex gap-3 pt-1 border-t">
+                <div className="pt-1 border-t">
                   <button
-                    onClick={() => { setNewSubOpen(true); setNewCatMode(false); setNewSubCatId(categorias[0]?.id || ''); }}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                  >
-                    <FolderPlus className="h-3.5 w-3.5" /> Nueva subcategoría
-                  </button>
-                  <button
-                    onClick={() => { setNewSubOpen(true); setNewCatMode(true); setNewCatName(''); setNewCatIcon('📦'); setNewCatTipo('otro'); }}
+                    onClick={() => { setNewCatMode(true); setNewCatName(''); setNewCatIcon('📦'); setNewCatTipo('otro'); }}
                     className="flex items-center gap-1.5 text-xs text-primary hover:underline"
                   >
                     <Plus className="h-3.5 w-3.5" /> Nueva categoría
                   </button>
                 </div>
               </>
-            ) : newCatMode ? (
+            ) : (
               /* Inline new CATEGORY form */
               <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
                 <p className="text-xs font-semibold">Nueva categoría</p>
@@ -407,39 +374,10 @@ export default function ProductosPage() {
                     </Select>
                   </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Después de crear la categoría podrás añadirle subcategorías.</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setNewSubOpen(false); setNewCatMode(false); }}>Cancelar</Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setNewCatMode(false)}>Cancelar</Button>
                   <Button size="sm" className="h-7 text-xs active:scale-95" onClick={() => createCatMut.mutate()} disabled={!newCatName.trim() || createCatMut.isPending}>
                     {createCatMut.isPending ? 'Creando...' : 'Crear categoría'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              /* Inline new SUBCATEGORY form */
-              <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
-                <p className="text-xs font-semibold">Nueva subcategoría</p>
-                <div>
-                  <Label className="text-xs">Categoría padre</Label>
-                  <Select value={newSubCatId} onValueChange={setNewSubCatId}>
-                    <SelectTrigger className="mt-1 bg-background h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Nombre</Label>
-                  <Input value={newSubName} onChange={e => setNewSubName(e.target.value)} className="mt-1 bg-background h-8 text-xs" placeholder="Ej: Carnes, Refrescos..." autoFocus />
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setNewSubOpen(false); setNewSubName(''); }}>Cancelar</Button>
-                  <Button size="sm" className="h-7 text-xs active:scale-95" onClick={() => createSubMut.mutate()} disabled={!newSubName.trim() || !newSubCatId || createSubMut.isPending}>
-                    {createSubMut.isPending ? 'Creando...' : 'Crear subcategoría'}
                   </Button>
                 </div>
               </div>
@@ -449,7 +387,7 @@ export default function ProductosPage() {
             <Button variant="outline" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => assignCatMut.mutate()}
-              disabled={!selectedSubcatId || assignCatMut.isPending}
+              disabled={!selectedCatId || assignCatMut.isPending}
               className="active:scale-95"
             >
               {assignCatMut.isPending ? 'Guardando...' : 'Asignar'}
