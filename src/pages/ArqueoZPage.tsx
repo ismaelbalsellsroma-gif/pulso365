@@ -36,6 +36,8 @@ export default function ArqueoZPage() {
   const [pendingMatchedLines, setPendingMatchedLines] = useState<FamiliaLine[]>([]);
   const [pendingFecha, setPendingFecha] = useState('');
   const [pendingMultiQueue, setPendingMultiQueue] = useState<Array<{ matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string }>>([]);
+  const [newFamiliaName, setNewFamiliaName] = useState('');
+  const [creatingFamilia, setCreatingFamilia] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const multiFileRef = useRef<HTMLInputElement>(null);
 
