@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { fetchProveedores, fetchAlbaranes, fmt } from '@/lib/queries';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { upsertProveedor, deleteProveedor } from '@/lib/mutations';
 import { Plus, Search, Phone, Mail, Pencil, Trash2, FileText, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
