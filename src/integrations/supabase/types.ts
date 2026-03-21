@@ -863,6 +863,144 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_conteos: {
+        Row: {
+          anyo: number | null
+          cantidad: number
+          created_at: string
+          fecha: string
+          id: string
+          producto_id: string
+          semana: number | null
+          tipo: string | null
+          unidad: string | null
+        }
+        Insert: {
+          anyo?: number | null
+          cantidad?: number
+          created_at?: string
+          fecha?: string
+          id?: string
+          producto_id: string
+          semana?: number | null
+          tipo?: string | null
+          unidad?: string | null
+        }
+        Update: {
+          anyo?: number | null
+          cantidad?: number
+          created_at?: string
+          fecha?: string
+          id?: string
+          producto_id?: string
+          semana?: number | null
+          tipo?: string | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_conteos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_desviaciones: {
+        Row: {
+          compras_periodo: number | null
+          consumo_real: number | null
+          consumo_teorico: number | null
+          created_at: string
+          desviacion: number | null
+          desviacion_euros: number | null
+          desviacion_porcentaje: number | null
+          id: string
+          periodo_fin: string
+          periodo_inicio: string
+          producto_id: string
+          stock_final: number | null
+          stock_inicial: number | null
+        }
+        Insert: {
+          compras_periodo?: number | null
+          consumo_real?: number | null
+          consumo_teorico?: number | null
+          created_at?: string
+          desviacion?: number | null
+          desviacion_euros?: number | null
+          desviacion_porcentaje?: number | null
+          id?: string
+          periodo_fin: string
+          periodo_inicio: string
+          producto_id: string
+          stock_final?: number | null
+          stock_inicial?: number | null
+        }
+        Update: {
+          compras_periodo?: number | null
+          consumo_real?: number | null
+          consumo_teorico?: number | null
+          created_at?: string
+          desviacion?: number | null
+          desviacion_euros?: number | null
+          desviacion_porcentaje?: number | null
+          id?: string
+          periodo_fin?: string
+          periodo_inicio?: string
+          producto_id?: string
+          stock_final?: number | null
+          stock_inicial?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_desviaciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_solicitudes_semanales: {
+        Row: {
+          anyo: number
+          completado: boolean | null
+          created_at: string
+          fecha_completado: string | null
+          id: string
+          producto_id: string
+          semana: number
+        }
+        Insert: {
+          anyo: number
+          completado?: boolean | null
+          created_at?: string
+          fecha_completado?: string | null
+          id?: string
+          producto_id: string
+          semana: number
+        }
+        Update: {
+          anyo?: number
+          completado?: boolean | null
+          created_at?: string
+          fecha_completado?: string | null
+          id?: string
+          producto_id?: string
+          semana?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_solicitudes_semanales_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subcategorias: {
         Row: {
           categoria_id: string
