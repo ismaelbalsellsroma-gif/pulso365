@@ -175,6 +175,8 @@ export async function upsertPlato(data: {
   pvp?: number;
   coste?: number;
   margen_pct?: number;
+  descripcion?: string;
+  iva_porcentaje?: number;
 }) {
   const { id, ...rest } = data;
   if (id) {
