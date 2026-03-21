@@ -453,7 +453,7 @@ export default function ArqueoZPage() {
 
       {/* Resolve unmatched families dialog */}
       <Dialog open={resolveOpen} onOpenChange={(open) => { if (!open) { setResolveOpen(false); setUnmatchedLines([]); setPendingMultiQueue([]); } }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -485,6 +485,48 @@ export default function ArqueoZPage() {
                 </Select>
               </div>
             ))}
+          </div>
+
+          {/* Crear nueva familia inline */}
+          <div className="border border-dashed border-[hsl(var(--divider))] rounded-lg p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">¿No encuentras la familia? Créala aquí:</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nombre de la nueva familia"
+                value={newFamiliaName}
+                onChange={e => setNewFamiliaName(e.target.value.toUpperCase())}
+                className="bg-background text-sm flex-1"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!newFamiliaName.trim() || creatingFamilia}
+                className="gap-1 active:scale-95"
+                onClick={async () => {
+                  const name = newFamiliaName.trim();
+                  if (!name) return;
+                  // Check duplicate
+                  if (familias.some(f => f.nombre.toLowerCase() === name.toLowerCase())) {
+                    toast.error('Esa familia ya existe');
+                    return;
+                  }
+                  setCreatingFamilia(true);
+                  try {
+                    await supabase.from('familias').insert({ nombre: name, orden: familias.length });
+                    await qc.invalidateQueries({ queryKey: ['familias'] });
+                    setNewFamiliaName('');
+                    toast.success(`Familia "${name}" creada`);
+                  } catch {
+                    toast.error('Error creando familia');
+                  } finally {
+                    setCreatingFamilia(false);
+                  }
+                }}
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Crear
+              </Button>
+            </div>
           </div>
 
           {pendingMultiQueue.length > 1 && (
