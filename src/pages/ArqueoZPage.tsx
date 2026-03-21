@@ -9,7 +9,7 @@ import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchArqueos, fetchFamilias, fmt } from '@/lib/queries';
 import { upsertArqueo, deleteArqueo } from '@/lib/mutations';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, Plus, Camera, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Plus, Camera, Pencil, Trash2, Loader2, Images } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FamiliaLine {
@@ -26,7 +26,9 @@ export default function ArqueoZPage() {
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [lines, setLines] = useState<FamiliaLine[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const multiFileRef = useRef<HTMLInputElement>(null);
 
   const qc = useQueryClient();
   const { data: arqueos = [], isLoading } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
@@ -43,6 +45,7 @@ export default function ArqueoZPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['arqueos'] });
+      qc.invalidateQueries({ queryKey: ['familias'] });
       setDialogOpen(false);
       toast.success(editId ? 'Arqueo actualizado' : 'Arqueo guardado');
     },
@@ -86,23 +89,32 @@ export default function ArqueoZPage() {
   const addLine = () => setLines(prev => [...prev, { familia_nombre: '', unidades: 0, importe: 0 }]);
   const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
 
+  /** Convert a File to base64 */
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+
+  /** Process a single image via AI and return extracted data */
+  const processOneTicket = async (base64: string) => {
+    const { data, error } = await supabase.functions.invoke('process-arqueo-z', {
+      body: { image_base64: base64, familias_conocidas: familias.map(f => f.nombre) },
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  /** Single scan → opens dialog with extracted data */
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setScanning(true);
     try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.readAsDataURL(file);
-      });
-
-      const { data, error } = await supabase.functions.invoke('process-arqueo-z', {
-        body: { image_base64: base64, familias_conocidas: familias.map(f => f.nombre) },
-      });
-
-      if (error) throw error;
+      const base64 = await fileToBase64(file);
+      const data = await processOneTicket(base64);
 
       if (data.fecha) setFecha(data.fecha);
       if (data.familias && Array.isArray(data.familias)) {
@@ -122,12 +134,70 @@ export default function ArqueoZPage() {
     }
   };
 
+  /** Multi-scan → processes multiple images and saves each as a separate arqueo */
+  const handleMultiScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    setScanning(true);
+    let saved = 0;
+    let errors = 0;
+
+    for (let i = 0; i < fileArray.length; i++) {
+      setScanProgress(`Procesando ${i + 1} de ${fileArray.length}...`);
+      try {
+        const base64 = await fileToBase64(fileArray[i]);
+        const data = await processOneTicket(base64);
+
+        const extractedFamilias: FamiliaLine[] = (data.familias || []).map((f: any) => ({
+          familia_nombre: f.familia_nombre || f.nombre || '',
+          unidades: Number(f.unidades) || 0,
+          importe: Number(f.importe) || 0,
+        }));
+
+        const total = extractedFamilias.reduce((s, l) => s + l.importe, 0);
+
+        await upsertArqueo({
+          fecha: data.fecha || new Date().toISOString().slice(0, 10),
+          total_sin_iva: data.total_sin_iva || total,
+          familias: extractedFamilias,
+        });
+        saved++;
+      } catch (err) {
+        console.error(`Error processing file ${fileArray[i].name}:`, err);
+        errors++;
+      }
+    }
+
+    qc.invalidateQueries({ queryKey: ['arqueos'] });
+    qc.invalidateQueries({ queryKey: ['familias'] });
+    setScanning(false);
+    setScanProgress('');
+    if (multiFileRef.current) multiFileRef.current.value = '';
+
+    if (saved > 0) toast.success(`${saved} arqueo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''} correctamente`);
+    if (errors > 0) toast.error(`${errors} ticket${errors > 1 ? 's' : ''} no se pudieron procesar`);
+  };
+
   const totalGlobal = arqueos.reduce((s, a) => s + (Number(a.total_sin_iva) || 0), 0);
 
   return (
     <div className="space-y-5">
       <PageHeader title="Arqueo Z" description="Registro diario de ventas por familia — tiquets Z">
-        <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo Arqueo</Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 active:scale-95"
+            onClick={() => multiFileRef.current?.click()}
+            disabled={scanning}
+          >
+            {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Images className="h-4 w-4" />}
+            {scanning ? scanProgress || 'Procesando...' : 'Escanear varios'}
+          </Button>
+          <input ref={multiFileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleMultiScan} />
+          <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo Arqueo</Button>
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-fade-in-up">

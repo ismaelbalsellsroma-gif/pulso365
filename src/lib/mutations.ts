@@ -198,6 +198,22 @@ export async function deletePlato(id: string) {
 }
 
 // ─── Arqueos Z ───
+
+/** Auto-create any familias that don't exist yet */
+async function ensureFamiliasExist(nombres: string[]) {
+  if (nombres.length === 0) return;
+  const unique = [...new Set(nombres.filter(Boolean).map(n => n.trim()))];
+  const { data: existing } = await supabase
+    .from('familias')
+    .select('nombre')
+    .in('nombre', unique);
+  const existingNames = new Set((existing || []).map(f => f.nombre));
+  const toCreate = unique.filter(n => !existingNames.has(n));
+  if (toCreate.length > 0) {
+    await supabase.from('familias').insert(toCreate.map(n => ({ nombre: n })));
+  }
+}
+
 export async function upsertArqueo(data: {
   id?: string;
   fecha: string;
@@ -206,10 +222,12 @@ export async function upsertArqueo(data: {
 }) {
   const { id, familias, ...rest } = data;
 
+  // Auto-create missing familias
+  await ensureFamiliasExist(familias.map(f => f.familia_nombre));
+
   if (id) {
     const { error } = await supabase.from('arqueos_z').update(rest).eq('id', id);
     if (error) throw error;
-    // Delete old familia lines and re-insert
     await supabase.from('arqueo_familias').delete().eq('arqueo_id', id);
     if (familias.length > 0) {
       const { error: fErr } = await supabase.from('arqueo_familias').insert(
