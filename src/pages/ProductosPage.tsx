@@ -97,6 +97,26 @@ export default function ProductosPage() {
     onError: () => toast.error('Error asignando categoría'),
   });
 
+  // Create new category inline
+  const createCatMut = useMutation({
+    mutationFn: async () => {
+      if (!newCatName.trim()) return;
+      const { data, error } = await supabase.from('categorias').insert({ nombre: newCatName.trim(), icon: newCatIcon, tipo: newCatTipo }).select('id').single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['categorias'] });
+      if (data) {
+        setNewSubCatId(data.id);
+        setNewCatMode(false);
+        setNewCatName('');
+      }
+      toast.success('Categoría creada');
+    },
+    onError: () => toast.error('Error creando categoría'),
+  });
+
   // Create new subcategory inline
   const createSubMut = useMutation({
     mutationFn: async () => {
