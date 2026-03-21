@@ -13,7 +13,8 @@ import { upsertProducto, deleteProducto } from '@/lib/mutations';
 import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '' };
+const UNIDADES_CONTENIDO = ['kg', 'g', 'L', 'ml', 'ud'];
+const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '', contenido_neto: '' as string, contenido_unidad: 'kg' };
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
