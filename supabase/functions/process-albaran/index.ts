@@ -6,6 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Normaliza texto para comparaciones */
+function normalizeName(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const wa = na.split(" ").slice(0, 2).join(" ");
+  const wb = nb.split(" ").slice(0, 2).join(" ");
+  if (wa.length >= 4 && wa === wb) return true;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
