@@ -39,7 +39,9 @@ export default function CartaPage() {
   const [deleteIngOpen, setDeleteIngOpen] = useState(false);
   const [deleteIngId, setDeleteIngId] = useState<string | null>(null);
   const [ingSearch, setIngSearch] = useState('');
-
+  const [ingStep, setIngStep] = useState<'pick' | 'details'>('pick');
+  const [needsContenidoNeto, setNeedsContenidoNeto] = useState(false);
+  const [contenidoNetoForm, setContenidoNetoForm] = useState({ contenido_neto: 0, contenido_unidad: 'kg' });
   const qc = useQueryClient();
   const { data: platos = [], isLoading } = useQuery({ queryKey: ['platos'], queryFn: fetchPlatos });
   const { data: familias = [] } = useQuery({ queryKey: ['familias'], queryFn: fetchFamilias });
