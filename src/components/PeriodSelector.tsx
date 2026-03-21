@@ -19,27 +19,36 @@ function formatLabel(desde: string, hasta: string) {
   return `${d} — ${h}`;
 }
 
-export function PeriodSelector() {
+interface Props {
+  onChange?: (desde: string, hasta: string) => void;
+}
+
+export function PeriodSelector({ onChange }: Props = {}) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const [active, setActive] = useState<Period>('mes');
-  const [desde, setDesde] = useState(toISO(monthStart));
-  const [hasta, setHasta] = useState(toISO(now));
+  const [desde, setDesdeLocal] = useState(toISO(monthStart));
+  const [hasta, setHastaLocal] = useState(toISO(now));
+
+  const setDesde = (v: string) => { setDesdeLocal(v); onChange?.(v, hasta); };
+  const setHasta = (v: string) => { setHastaLocal(v); onChange?.(desde, v); };
 
   function setPeriod(type: Period) {
     setActive(type);
+    let d = desde, h = toISO(now);
     if (type === 'hoy') {
-      const t = toISO(now);
-      setDesde(t); setHasta(t);
+      d = toISO(now); h = toISO(now);
     } else if (type === 'semana') {
       const day = now.getDay();
       const diff = day === 0 ? 6 : day - 1;
       const monday = new Date(now);
       monday.setDate(now.getDate() - diff);
-      setDesde(toISO(monday)); setHasta(toISO(now));
+      d = toISO(monday);
     } else if (type === 'mes') {
-      setDesde(toISO(monthStart)); setHasta(toISO(now));
+      d = toISO(monthStart);
     }
+    setDesdeLocal(d); setHastaLocal(h);
+    onChange?.(d, h);
   }
 
   const chips: { label: string; value: Period }[] = [
