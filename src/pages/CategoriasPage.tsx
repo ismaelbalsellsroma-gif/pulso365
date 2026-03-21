@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
-import { fetchCategorias } from '@/lib/queries';
+import { fetchCategorias, fetchProductos, fmt } from '@/lib/queries';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +32,14 @@ export default function CategoriasPage() {
 
   const qc = useQueryClient();
   const { data: categorias = [], isLoading } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
+  const { data: productos = [] } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
+
+  // Count products per category
+  const productosPerCat = (catId: string) => {
+    const prods = productos.filter(p => p.categoria_id === catId);
+    return { count: prods.length, total: prods.reduce((s, p) => s + (Number(p.precio_actual) || 0), 0) };
+  };
+  const sinCategoria = productos.filter(p => !p.categoria_id).length;
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -121,7 +129,20 @@ export default function CategoriasPage() {
         <div className="text-sm text-muted-foreground p-8 text-center">No hay categorías. Crea la primera.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in-up">
-          {categorias.map(cat => (
+          {sinCategoria > 0 && (
+            <div className="panel-card border-[hsl(var(--warning))] border-dashed">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-[hsl(var(--warning-highlight))] flex items-center justify-center text-lg">⚠️</div>
+                <div>
+                  <h3 className="font-semibold text-sm">Sin categoría</h3>
+                  <span className="text-xs text-[hsl(var(--warning))] font-semibold">{sinCategoria} productos</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {categorias.map(cat => {
+            const stats = productosPerCat(cat.id);
+            return (
             <div key={cat.id} className="panel-card group">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
@@ -148,18 +169,20 @@ export default function CategoriasPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-1">
+              <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+                <span className="font-semibold text-foreground">{stats.count}</span> productos
+                {stats.count > 0 && <span>· últ. precio total {fmt(stats.total)}</span>}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
                 {(cat.subcategorias || []).map((sub: any) => (
                   <span key={sub.id} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-[hsl(var(--divider))] text-muted-foreground">
                     {sub.nombre}
                   </span>
                 ))}
-                {(!cat.subcategorias || cat.subcategorias.length === 0) && (
-                  <span className="text-[10px] text-muted-foreground">Sin subcategorías</span>
-                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
