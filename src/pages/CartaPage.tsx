@@ -408,75 +408,173 @@ export default function CartaPage() {
 
         {/* Ingredient add/edit dialog */}
         <Dialog open={ingDialogOpen} onOpenChange={setIngDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className={ingStep === 'pick' ? 'sm:max-w-2xl max-h-[85vh] flex flex-col' : 'sm:max-w-md'}>
             <DialogHeader>
-              <DialogTitle>{editIngId ? 'Editar Ingrediente' : 'Añadir Ingrediente'}</DialogTitle>
+              <DialogTitle>{editIngId ? 'Editar Ingrediente' : ingStep === 'pick' ? 'Seleccionar Producto' : 'Detalles del Ingrediente'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div>
-                <Label className="text-sm font-semibold">Producto *</Label>
-                <Input placeholder="Buscar producto..." value={ingSearch} onChange={e => setIngSearch(e.target.value)} className="mt-1.5 bg-background" />
-                {ingSearch && !ingForm.producto_id && (
-                  <div className="mt-1 max-h-32 overflow-y-auto border rounded-md bg-card">
-                    {filteredProds.map(p => (
-                      <button key={p.id} onClick={() => { setIngForm(f => ({ ...f, producto_id: p.id })); setIngSearch(p.nombre); }}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors flex justify-between">
-                        <span className="truncate">{p.nombre}</span>
-                        <span className="text-xs text-muted-foreground tabular-nums shrink-0 ml-2">{fmt(Number(p.precio_actual))}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {ingForm.producto_id && ingPreviewProd && (
-                  <div className="mt-1.5 flex items-center gap-2 bg-primary/5 px-3 py-1.5 rounded-md border border-primary/20">
-                    <Package className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <span className="text-sm font-medium truncate">{ingPreviewProd.nombre}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums ml-auto">{fmt(Number(ingPreviewProd.precio_actual))}/{ingPreviewProd.unidad || 'ud'}</span>
-                    <button onClick={() => { setIngForm(f => ({ ...f, producto_id: '' })); setIngSearch(''); }} className="p-0.5 rounded hover:bg-muted"><X className="h-3 w-3" /></button>
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-sm font-semibold">Cantidad</Label>
-                  <Input type="number" step="0.001" value={ingForm.cantidad} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+
+            {/* STEP 1: Visual product grid picker */}
+            {ingStep === 'pick' && (
+              <div className="flex flex-col gap-3 flex-1 min-h-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar producto por nombre o referencia..."
+                    value={ingSearch}
+                    onChange={e => setIngSearch(e.target.value)}
+                    className="pl-9 bg-background"
+                    autoFocus
+                  />
                 </div>
-                <div>
-                  <Label className="text-sm font-semibold">Unidad</Label>
-                  <Select value={ingForm.unidad} onValueChange={v => setIngForm(f => ({ ...f, unidad: v }))}>
-                    <SelectTrigger className="mt-1.5 bg-background"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['kg', 'g', 'mg', 'l', 'ml', 'ud'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm font-semibold">Merma %</Label>
-                  <Input type="number" step="1" value={ingForm.merma_porcentaje} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-semibold">Notas</Label>
-                <Input value={ingForm.notas} onChange={e => setIngForm(f => ({ ...f, notas: e.target.value }))} className="mt-1.5 bg-background" placeholder="Ej: pelado, fileteado..." />
-              </div>
-              {ingPreviewCalc && (
-                <div className="bg-[hsl(var(--surface-offset))] rounded-lg p-3 text-center space-y-1">
-                  <p className="text-xs text-muted-foreground">Coste estimado de este ingrediente</p>
-                  <p className="text-lg font-bold tabular-nums">{fmt(ingPreviewCalc.coste)}</p>
-                  {ingPreviewCalc.contenido_neto && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Precio real: {fmt(ingPreviewCalc.precio_unitario)}/{ingPreviewCalc.unidad_calculo} (contenido neto: {ingPreviewCalc.contenido_neto} {ingPreviewCalc.unidad_calculo})
-                    </p>
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  {filteredProds.length === 0 ? (
+                    <div className="text-sm text-muted-foreground text-center py-12">No se encontraron productos.</div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pb-2">
+                      {filteredProds.map(p => {
+                        const hasContenido = p.contenido_neto && Number(p.contenido_neto) > 0;
+                        const precioReal = hasContenido
+                          ? (Number(p.precio_actual) / Number(p.contenido_neto))
+                          : null;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => handlePickProduct(p)}
+                            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border bg-card hover:border-primary hover:bg-primary/5 transition-all active:scale-95 text-center group"
+                          >
+                            <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                              <Package className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                            <p className="text-xs font-semibold leading-tight line-clamp-2 min-h-[2rem]">{p.nombre}</p>
+                            <p className="text-sm font-bold tabular-nums text-primary">{fmt(Number(p.precio_actual))}<span className="text-[10px] text-muted-foreground font-normal">/{p.unidad || 'ud'}</span></p>
+                            {precioReal !== null ? (
+                              <p className="text-[10px] text-muted-foreground tabular-nums">
+                                Real: {fmt(precioReal)}/{p.contenido_unidad}
+                              </p>
+                            ) : p.unidad !== 'ud' ? (
+                              <p className="text-[10px] text-[hsl(var(--warning))] font-medium flex items-center gap-0.5">
+                                <AlertTriangle className="h-2.5 w-2.5" /> Sin contenido neto
+                              </p>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIngDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={() => saveIngMut.mutate()} disabled={!ingForm.producto_id || saveIngMut.isPending} className="active:scale-95">
-                {saveIngMut.isPending ? 'Guardando...' : 'Guardar'}
-              </Button>
-            </DialogFooter>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIngDialogOpen(false)}>Cancelar</Button>
+                </DialogFooter>
+              </div>
+            )}
+
+            {/* STEP 2: Ingredient details */}
+            {ingStep === 'details' && (
+              <div className="space-y-4 py-2">
+                {/* Selected product badge */}
+                {ingForm.producto_id && ingPreviewProd && (
+                  <div className="flex items-center gap-2 bg-primary/5 px-3 py-2 rounded-lg border border-primary/20">
+                    <Package className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-semibold truncate">{ingPreviewProd.nombre}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums ml-auto">{fmt(Number(ingPreviewProd.precio_actual))}/{ingPreviewProd.unidad || 'ud'}</span>
+                    {!editIngId && (
+                      <button onClick={() => { setIngForm(f => ({ ...f, producto_id: '' })); setIngSearch(''); setIngStep('pick'); setNeedsContenidoNeto(false); }}
+                        className="p-0.5 rounded hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+                    )}
+                  </div>
+                )}
+
+                {/* Contenido neto warning & form */}
+                {needsContenidoNeto && (
+                  <div className="border-2 border-[hsl(var(--warning))] rounded-lg p-4 space-y-3 bg-[hsl(var(--warning))]/5">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold">Contenido neto obligatorio</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Este producto no tiene el contenido neto definido. Indícalo para calcular el coste real.
+                          Ej: una bolsa de lechuga de 2€ contiene 0.5 kg → precio real = 4€/kg.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs font-semibold">Cantidad neta</Label>
+                        <Input type="number" step="0.001" value={contenidoNetoForm.contenido_neto || ''}
+                          onChange={e => setContenidoNetoForm(f => ({ ...f, contenido_neto: parseFloat(e.target.value) || 0 }))}
+                          className="mt-1 bg-background" placeholder="Ej: 0.5" autoFocus />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold">Unidad</Label>
+                        <Select value={contenidoNetoForm.contenido_unidad} onValueChange={v => setContenidoNetoForm(f => ({ ...f, contenido_unidad: v }))}>
+                          <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {['kg', 'g', 'l', 'ml'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {contenidoNetoForm.contenido_neto > 0 && ingPreviewProd && (
+                      <p className="text-xs font-medium text-center">
+                        Precio real: <strong>{fmt(Number(ingPreviewProd.precio_actual) / contenidoNetoForm.contenido_neto)}/{contenidoNetoForm.contenido_unidad}</strong>
+                      </p>
+                    )}
+                    <Button size="sm" className="w-full active:scale-95" onClick={saveContenidoNeto}
+                      disabled={contenidoNetoForm.contenido_neto <= 0}>
+                      Guardar contenido neto
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-sm font-semibold">Cantidad</Label>
+                    <Input type="number" step="0.001" value={ingForm.cantidad} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Unidad</Label>
+                    <Select value={ingForm.unidad} onValueChange={v => setIngForm(f => ({ ...f, unidad: v }))}>
+                      <SelectTrigger className="mt-1.5 bg-background"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['kg', 'g', 'mg', 'l', 'ml', 'ud'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Merma %</Label>
+                    <Input type="number" step="1" value={ingForm.merma_porcentaje} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Notas</Label>
+                  <Input value={ingForm.notas} onChange={e => setIngForm(f => ({ ...f, notas: e.target.value }))} className="mt-1.5 bg-background" placeholder="Ej: pelado, fileteado..." />
+                </div>
+                {ingPreviewCalc && !needsContenidoNeto && (
+                  <div className="bg-[hsl(var(--surface-offset))] rounded-lg p-3 text-center space-y-1">
+                    <p className="text-xs text-muted-foreground">Coste estimado de este ingrediente</p>
+                    <p className="text-lg font-bold tabular-nums">{fmt(ingPreviewCalc.coste)}</p>
+                    {ingPreviewCalc.contenido_neto && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Precio real: {fmt(ingPreviewCalc.precio_unitario)}/{ingPreviewCalc.unidad_calculo} (contenido neto: {ingPreviewCalc.contenido_neto} {ingPreviewCalc.unidad_calculo})
+                      </p>
+                    )}
+                  </div>
+                )}
+                <DialogFooter>
+                  {!editIngId && (
+                    <Button variant="outline" onClick={() => { setIngForm(f => ({ ...f, producto_id: '' })); setIngSearch(''); setIngStep('pick'); setNeedsContenidoNeto(false); }}>
+                      ← Cambiar producto
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setIngDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={() => saveIngMut.mutate()}
+                    disabled={!ingForm.producto_id || needsContenidoNeto || saveIngMut.isPending}
+                    className="active:scale-95">
+                    {saveIngMut.isPending ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
