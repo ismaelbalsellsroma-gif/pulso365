@@ -10,7 +10,7 @@ import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchArqueos, fetchFamilias, fmt } from '@/lib/queries';
 import { upsertArqueo, deleteArqueo } from '@/lib/mutations';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, Plus, Camera, Pencil, Trash2, Loader2, Images, AlertTriangle } from 'lucide-react';
+import { Upload, Plus, Camera, Pencil, Trash2, Loader2, Images, AlertTriangle, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FamiliaLine {
