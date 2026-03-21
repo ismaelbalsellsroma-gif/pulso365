@@ -124,7 +124,7 @@ export default function ProductosPage() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', categoria_id: p.categoria_id || '' });
+    setForm({ nombre: p.nombre, referencia: p.referencia || '', unidad: p.unidad || 'ud', precio_actual: Number(p.precio_actual) || 0, proveedor_nombre: p.proveedor_nombre || '', categoria_id: p.categoria_id || '', contenido_neto: p.contenido_neto != null ? String(p.contenido_neto) : '', contenido_unidad: p.contenido_unidad || 'kg' });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
