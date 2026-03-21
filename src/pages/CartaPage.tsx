@@ -190,12 +190,47 @@ export default function CartaPage() {
     setEditIngId(null);
     setIngForm({ producto_id: '', cantidad: 0, unidad: 'kg', merma_porcentaje: 0, notas: '' });
     setIngSearch('');
+    setIngStep('pick');
+    setNeedsContenidoNeto(false);
     setIngDialogOpen(true);
   };
   const openEditIng = (ing: any) => {
     setEditIngId(ing.id);
     setIngForm({ producto_id: ing.producto_id || '', cantidad: Number(ing.cantidad) || 0, unidad: ing.unidad || 'kg', merma_porcentaje: Number(ing.merma_porcentaje) || 0, notas: ing.notas || '' });
+    setIngStep('details');
+    setNeedsContenidoNeto(false);
     setIngDialogOpen(true);
+  };
+
+  const handlePickProduct = (prod: any) => {
+    setIngForm(f => ({ ...f, producto_id: prod.id }));
+    setIngSearch(prod.nombre);
+    if (!prod.contenido_neto && prod.unidad !== 'ud') {
+      setNeedsContenidoNeto(true);
+      setContenidoNetoForm({ contenido_neto: 0, contenido_unidad: prod.unidad || 'kg' });
+    } else {
+      setNeedsContenidoNeto(false);
+    }
+    setIngStep('details');
+  };
+
+  const saveContenidoNeto = async () => {
+    if (!ingForm.producto_id || contenidoNetoForm.contenido_neto <= 0) return;
+    const prod = productoMap[ingForm.producto_id];
+    if (!prod) return;
+    try {
+      await upsertProducto({
+        id: ingForm.producto_id,
+        nombre: prod.nombre,
+        contenido_neto: contenidoNetoForm.contenido_neto,
+        contenido_unidad: contenidoNetoForm.contenido_unidad,
+      });
+      qc.invalidateQueries({ queryKey: ['productos'] });
+      setNeedsContenidoNeto(false);
+      toast.success('Contenido neto guardado');
+    } catch {
+      toast.error('Error guardando contenido neto');
+    }
   };
 
   // Preview cost in ingredient dialog
