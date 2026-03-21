@@ -1,30 +1,170 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
-import { fetchArqueos, fmt } from '@/lib/queries';
-import { Upload } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DeleteDialog } from '@/components/DeleteDialog';
+import { fetchArqueos, fetchFamilias, fmt } from '@/lib/queries';
+import { upsertArqueo, deleteArqueo } from '@/lib/mutations';
+import { supabase } from '@/integrations/supabase/client';
+import { Upload, Plus, Camera, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface FamiliaLine {
+  familia_nombre: string;
+  unidades: number;
+  importe: number;
+}
 
 export default function ArqueoZPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [lines, setLines] = useState<FamiliaLine[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const qc = useQueryClient();
   const { data: arqueos = [], isLoading } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
+  const { data: familias = [] } = useQuery({ queryKey: ['familias'], queryFn: fetchFamilias });
+
+  const totalSinIva = lines.reduce((s, l) => s + (Number(l.importe) || 0), 0);
+
+  const saveMut = useMutation({
+    mutationFn: () => upsertArqueo({
+      id: editId || undefined,
+      fecha,
+      total_sin_iva: totalSinIva,
+      familias: lines,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['arqueos'] });
+      setDialogOpen(false);
+      toast.success(editId ? 'Arqueo actualizado' : 'Arqueo guardado');
+    },
+    onError: () => toast.error('Error guardando arqueo'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: () => deleteArqueo(deleteId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['arqueos'] });
+      setDeleteOpen(false);
+      toast.success('Arqueo eliminado');
+    },
+    onError: () => toast.error('Error eliminando arqueo'),
+  });
+
+  const openNew = () => {
+    setEditId(null);
+    setFecha(new Date().toISOString().slice(0, 10));
+    setLines(familias.map(f => ({ familia_nombre: f.nombre, unidades: 0, importe: 0 })));
+    setDialogOpen(true);
+  };
+
+  const openEdit = (arq: any) => {
+    setEditId(arq.id);
+    setFecha(arq.fecha);
+    setLines((arq.arqueo_familias || []).map((f: any) => ({
+      familia_nombre: f.familia_nombre,
+      unidades: Number(f.unidades) || 0,
+      importe: Number(f.importe) || 0,
+    })));
+    setDialogOpen(true);
+  };
+
+  const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
+
+  const updateLine = (idx: number, field: keyof FamiliaLine, value: string | number) => {
+    setLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+  };
+
+  const addLine = () => setLines(prev => [...prev, { familia_nombre: '', unidades: 0, importe: 0 }]);
+  const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
+
+  const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanning(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('process-arqueo-z', {
+        body: { image_base64: base64, familias_conocidas: familias.map(f => f.nombre) },
+      });
+
+      if (error) throw error;
+
+      if (data.fecha) setFecha(data.fecha);
+      if (data.familias && Array.isArray(data.familias)) {
+        setLines(data.familias.map((f: any) => ({
+          familia_nombre: f.familia_nombre || f.nombre || '',
+          unidades: Number(f.unidades) || 0,
+          importe: Number(f.importe) || 0,
+        })));
+      }
+      toast.success('Ticket Z interpretado correctamente');
+    } catch (err) {
+      console.error('Scan error:', err);
+      toast.error('Error interpretando el ticket Z');
+    } finally {
+      setScanning(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const totalGlobal = arqueos.reduce((s, a) => s + (Number(a.total_sin_iva) || 0), 0);
 
   return (
     <div className="space-y-5">
       <PageHeader title="Arqueo Z" description="Registro diario de ventas por familia — tiquets Z">
-        <Button className="gap-2 active:scale-95"><Upload className="h-4 w-4" /> Escanear Tiquet Z</Button>
+        <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo Arqueo</Button>
       </PageHeader>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-fade-in-up">
+        <div className="panel-card">
+          <div className="panel-card-header"><span>Total arqueos</span></div>
+          <div className="panel-card-value text-2xl">{arqueos.length}</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><span>Ventas acumuladas</span></div>
+          <div className="panel-card-value text-2xl tabular-nums">{fmt(totalGlobal)}</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><span>Media diaria</span></div>
+          <div className="panel-card-value text-2xl tabular-nums">{arqueos.length > 0 ? fmt(totalGlobal / arqueos.length) : '—'}</div>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground p-8 text-center">Cargando arqueos...</div>
+      ) : arqueos.length === 0 ? (
+        <div className="text-sm text-muted-foreground p-8 text-center">No hay arqueos. Crea el primero o escanea un ticket Z.</div>
       ) : (
         <div className="space-y-4 animate-fade-in-up">
           {arqueos.map(arq => (
-            <div key={arq.id} className="panel-card !p-0 overflow-hidden">
+            <div key={arq.id} className="panel-card !p-0 overflow-hidden group">
               <div className="px-5 py-4 bg-[hsl(var(--surface-offset))] flex items-center justify-between border-b border-[hsl(var(--divider))]">
                 <div>
                   <h3 className="font-semibold text-sm">{arq.fecha}</h3>
                   <p className="text-xs text-muted-foreground">Arqueo Z</p>
                 </div>
-                <p className="text-lg font-bold tabular-nums">{fmt(Number(arq.total_sin_iva))}</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-lg font-bold tabular-nums">{fmt(Number(arq.total_sin_iva))}</p>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(arq)} className="p-1.5 rounded-md text-muted-foreground hover:text-primary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => openDelete(arq.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -50,6 +190,82 @@ export default function ArqueoZPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Editar Arqueo Z' : 'Nuevo Arqueo Z'}</DialogTitle>
+          </DialogHeader>
+
+          {/* Scan button */}
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2 flex-1 active:scale-95" onClick={() => fileRef.current?.click()} disabled={scanning}>
+              {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {scanning ? 'Interpretando...' : 'Escanear Ticket Z'}
+            </Button>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScan} />
+          </div>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold">Fecha</Label>
+              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="mt-1.5 bg-background w-44" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold">Familias</Label>
+                <Button variant="ghost" size="sm" onClick={addLine} className="gap-1 text-xs"><Plus className="h-3 w-3" /> Añadir</Button>
+              </div>
+
+              <div className="space-y-2">
+                {lines.map((line, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-center">
+                    <Input
+                      placeholder="Familia"
+                      value={line.familia_nombre}
+                      onChange={e => updateLine(idx, 'familia_nombre', e.target.value)}
+                      className="bg-background text-sm"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Uds"
+                      value={line.unidades || ''}
+                      onChange={e => updateLine(idx, 'unidades', parseInt(e.target.value) || 0)}
+                      className="bg-background text-sm text-center"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Importe"
+                      value={line.importe || ''}
+                      onChange={e => updateLine(idx, 'importe', parseFloat(e.target.value) || 0)}
+                      className="bg-background text-sm text-right"
+                    />
+                    <button onClick={() => removeLine(idx)} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-[hsl(var(--surface-offset))] rounded-lg p-3 flex justify-between items-center">
+              <span className="text-sm font-semibold">Total sin IVA</span>
+              <span className="text-lg font-bold tabular-nums">{fmt(totalSinIva)}</span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => saveMut.mutate()} disabled={lines.length === 0 || saveMut.isPending} className="active:scale-95">
+              {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={() => delMut.mutate()} isPending={delMut.isPending} title="¿Eliminar arqueo?" description="Se eliminará el arqueo Z y sus datos de familias." />
     </div>
   );
 }
