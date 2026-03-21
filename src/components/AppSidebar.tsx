@@ -111,11 +111,18 @@ export function AppSidebar() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-xs font-medium">Mi Restaurante</span>
-              <span className="text-[10px] text-muted-foreground">Plan Básico</span>
+            <div className="flex flex-col flex-1">
+              <span className="text-xs font-medium truncate">{session?.user?.email}</span>
+              <span className="text-[10px] text-muted-foreground">Conectado</span>
             </div>
           )}
+          <button
+            onClick={signOut}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors active:scale-95"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>
