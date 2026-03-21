@@ -243,7 +243,7 @@ export default function CartaPage() {
   // Filtered productos for ingredient selector
   const filteredProds = productos.filter(p =>
     !ingSearch || p.nombre.toLowerCase().includes(ingSearch.toLowerCase()) || (p.referencia || '').toLowerCase().includes(ingSearch.toLowerCase())
-  ).slice(0, 20);
+  ).slice(0, 50);
 
   // ── Scan carta ──
   const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
