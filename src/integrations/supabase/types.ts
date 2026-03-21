@@ -591,6 +591,8 @@ export type Database = {
           cantidad: number | null
           coste: number | null
           id: string
+          merma_porcentaje: number | null
+          notas: string | null
           plato_id: string
           producto_id: string | null
           producto_nombre: string
@@ -600,6 +602,8 @@ export type Database = {
           cantidad?: number | null
           coste?: number | null
           id?: string
+          merma_porcentaje?: number | null
+          notas?: string | null
           plato_id: string
           producto_id?: string | null
           producto_nombre: string
@@ -609,6 +613,8 @@ export type Database = {
           cantidad?: number | null
           coste?: number | null
           id?: string
+          merma_porcentaje?: number | null
+          notas?: string | null
           plato_id?: string
           producto_id?: string | null
           producto_nombre?: string
@@ -635,8 +641,11 @@ export type Database = {
         Row: {
           coste: number | null
           created_at: string
+          descripcion: string | null
           familia_id: string | null
+          foto_url: string | null
           id: string
+          iva_porcentaje: number | null
           margen_pct: number | null
           nombre: string
           pvp: number | null
@@ -645,8 +654,11 @@ export type Database = {
         Insert: {
           coste?: number | null
           created_at?: string
+          descripcion?: string | null
           familia_id?: string | null
+          foto_url?: string | null
           id?: string
+          iva_porcentaje?: number | null
           margen_pct?: number | null
           nombre: string
           pvp?: number | null
@@ -655,8 +667,11 @@ export type Database = {
         Update: {
           coste?: number | null
           created_at?: string
+          descripcion?: string | null
           familia_id?: string | null
+          foto_url?: string | null
           id?: string
+          iva_porcentaje?: number | null
           margen_pct?: number | null
           nombre?: string
           pvp?: number | null
