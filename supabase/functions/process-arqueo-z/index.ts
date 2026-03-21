@@ -17,14 +17,23 @@ serve(async (req) => {
 
     const systemPrompt = `Eres un experto en interpretar tickets Z (arqueos de caja) de restaurantes.
 Extrae la información del ticket Z en la imagen. Devuelve la información usando la tool proporcionada.
-Familias conocidas del negocio: ${familiasList}
-Intenta mapear cada línea del ticket a una de las familias conocidas. Si no coincide, usa el nombre tal cual aparece.
+
+FAMILIAS EXISTENTES del negocio (usa EXACTAMENTE estos nombres): ${familiasList}
+
+REGLAS OBLIGATORIAS:
+1. Cada línea del ticket DEBE mapearse a una de las familias existentes usando EXACTAMENTE el mismo nombre.
+2. Si una línea del ticket coincide claramente con una familia existente (mismo nombre, abreviación, o sinónimo obvio), usa el nombre exacto de la familia existente.
+   Ejemplos: "HAMBURGUE.." → "HAMBURGUESAS", "VINOS y ESP.." → "VINOS Y ESPIRITUOSOS", "Licores" → "VINOS Y ESPIRITUOSOS"
+3. Si NO puedes mapear una línea a ninguna familia existente, ponla con su nombre original y marca matched=false.
+4. Si SÍ la puedes mapear, usa el nombre exacto de la familia existente y marca matched=true.
+5. NUNCA crees nombres nuevos si existe uno equivalente en la lista.
+
 Presta atención a los decimales: el formato español usa comas como separador decimal.
 
 MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
-- Si el ticket muestra importes con IVA incluido, divide SIEMPRE entre 1.10 para obtener la base imponible.
-- El total_sin_iva debe ser la suma de todos los importes sin IVA.
-- Aplica IVA del 10% a TODAS las familias sin excepción.`;
+- SIEMPRE divide los importes entre 1.10 para obtener la base imponible.
+- El IVA es SIEMPRE del 10% para TODOS los conceptos sin excepción.
+- El total_sin_iva debe ser la suma de todos los importes ya divididos entre 1.10.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -39,7 +48,7 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
           {
             role: "user",
             content: [
-              { type: "text", text: "Interpreta este ticket Z y extrae fecha, familias con unidades e importes." },
+              { type: "text", text: "Interpreta este ticket Z y extrae fecha, familias con unidades e importes. Mapea cada línea a las familias existentes." },
               { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image_base64}` } },
             ],
           },
@@ -49,7 +58,7 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
             type: "function",
             function: {
               name: "extract_arqueo_z",
-              description: "Extraer datos del ticket Z",
+              description: "Extraer datos del ticket Z mapeando a familias existentes",
               parameters: {
                 type: "object",
                 properties: {
@@ -59,16 +68,18 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
                     items: {
                       type: "object",
                       properties: {
-                        familia_nombre: { type: "string", description: "Nombre de la familia de venta" },
+                        familia_nombre: { type: "string", description: "Nombre EXACTO de la familia existente, o nombre original si no hay match" },
+                        nombre_ticket: { type: "string", description: "Nombre tal como aparece en el ticket" },
                         unidades: { type: "number", description: "Número de unidades vendidas" },
-                        importe: { type: "number", description: "Importe total de la familia sin IVA" },
+                        importe: { type: "number", description: "Importe total de la familia sin IVA (dividido entre 1.10)" },
+                        matched: { type: "boolean", description: "true si se mapeó a una familia existente, false si no se encontró coincidencia" },
                       },
-                      required: ["familia_nombre", "unidades", "importe"],
+                      required: ["familia_nombre", "nombre_ticket", "unidades", "importe", "matched"],
                     },
                   },
                   total_sin_iva: { type: "number", description: "Total de ventas sin IVA" },
                 },
-                required: ["fecha", "familias"],
+                required: ["fecha", "familias", "total_sin_iva"],
               },
             },
           },
@@ -80,14 +91,12 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Límite de peticiones alcanzado, intenta de nuevo en unos segundos." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Créditos agotados." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
@@ -110,8 +119,7 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
   } catch (e) {
     console.error("process-arqueo-z error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

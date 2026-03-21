@@ -5,17 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchArqueos, fetchFamilias, fmt } from '@/lib/queries';
 import { upsertArqueo, deleteArqueo } from '@/lib/mutations';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, Plus, Camera, Pencil, Trash2, Loader2, Images } from 'lucide-react';
+import { Upload, Plus, Camera, Pencil, Trash2, Loader2, Images, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FamiliaLine {
   familia_nombre: string;
+  nombre_ticket?: string;
   unidades: number;
   importe: number;
+  matched?: boolean;
 }
 
 export default function ArqueoZPage() {
@@ -27,6 +30,12 @@ export default function ArqueoZPage() {
   const [lines, setLines] = useState<FamiliaLine[]>([]);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
+  const [unmatchedLines, setUnmatchedLines] = useState<FamiliaLine[]>([]);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveMapping, setResolveMapping] = useState<Record<number, string>>({});
+  const [pendingMatchedLines, setPendingMatchedLines] = useState<FamiliaLine[]>([]);
+  const [pendingFecha, setPendingFecha] = useState('');
+  const [pendingMultiQueue, setPendingMultiQueue] = useState<Array<{ matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string }>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const multiFileRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +50,7 @@ export default function ArqueoZPage() {
       id: editId || undefined,
       fecha,
       total_sin_iva: totalSinIva,
-      familias: lines,
+      familias: lines.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['arqueos'] });
@@ -65,7 +74,7 @@ export default function ArqueoZPage() {
   const openNew = () => {
     setEditId(null);
     setFecha(new Date().toISOString().slice(0, 10));
-    setLines(familias.map(f => ({ familia_nombre: f.nombre, unidades: 0, importe: 0 })));
+    setLines(familias.map(f => ({ familia_nombre: f.nombre, unidades: 0, importe: 0, matched: true })));
     setDialogOpen(true);
   };
 
@@ -76,6 +85,7 @@ export default function ArqueoZPage() {
       familia_nombre: f.familia_nombre,
       unidades: Number(f.unidades) || 0,
       importe: Number(f.importe) || 0,
+      matched: true,
     })));
     setDialogOpen(true);
   };
@@ -86,10 +96,9 @@ export default function ArqueoZPage() {
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
   };
 
-  const addLine = () => setLines(prev => [...prev, { familia_nombre: '', unidades: 0, importe: 0 }]);
+  const addLine = () => setLines(prev => [...prev, { familia_nombre: '', unidades: 0, importe: 0, matched: true }]);
   const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
 
-  /** Convert a File to base64 */
   const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve) => {
       const reader = new FileReader();
@@ -97,13 +106,63 @@ export default function ArqueoZPage() {
       reader.readAsDataURL(file);
     });
 
-  /** Process a single image via AI and return extracted data */
   const processOneTicket = async (base64: string) => {
     const { data, error } = await supabase.functions.invoke('process-arqueo-z', {
       body: { image_base64: base64, familias_conocidas: familias.map(f => f.nombre) },
     });
     if (error) throw error;
     return data;
+  };
+
+  /** Separate matched and unmatched lines from AI result */
+  const separateLines = (data: any): { matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string } => {
+    const allLines: FamiliaLine[] = (data.familias || []).map((f: any) => ({
+      familia_nombre: f.familia_nombre || f.nombre || '',
+      nombre_ticket: f.nombre_ticket || f.familia_nombre || '',
+      unidades: Number(f.unidades) || 0,
+      importe: Number(f.importe) || 0,
+      matched: f.matched !== false,
+    }));
+
+    const familiaNames = new Set(familias.map(f => f.nombre.toLowerCase().trim()));
+    
+    const matched: FamiliaLine[] = [];
+    const unmatched: FamiliaLine[] = [];
+
+    for (const line of allLines) {
+      if (line.matched && familiaNames.has(line.familia_nombre.toLowerCase().trim())) {
+        matched.push(line);
+      } else {
+        line.matched = false;
+        unmatched.push(line);
+      }
+    }
+
+    return { matched, unmatched, fecha: data.fecha || new Date().toISOString().slice(0, 10) };
+  };
+
+  /** Merge unmatched lines into matched lines based on user mapping */
+  const applyResolution = (matched: FamiliaLine[], unmatched: FamiliaLine[], mapping: Record<number, string>): FamiliaLine[] => {
+    const result = [...matched];
+    
+    for (let i = 0; i < unmatched.length; i++) {
+      const targetFamily = mapping[i];
+      if (!targetFamily) continue; // skip unmapped
+      
+      const existingIdx = result.findIndex(r => r.familia_nombre === targetFamily);
+      if (existingIdx >= 0) {
+        // Merge: add units and amount to existing family
+        result[existingIdx] = {
+          ...result[existingIdx],
+          unidades: result[existingIdx].unidades + unmatched[i].unidades,
+          importe: result[existingIdx].importe + unmatched[i].importe,
+        };
+      } else {
+        result.push({ ...unmatched[i], familia_nombre: targetFamily, matched: true });
+      }
+    }
+    
+    return result;
   };
 
   /** Single scan → opens dialog with extracted data */
@@ -115,16 +174,20 @@ export default function ArqueoZPage() {
     try {
       const base64 = await fileToBase64(file);
       const data = await processOneTicket(base64);
+      const { matched, unmatched, fecha: extractedFecha } = separateLines(data);
 
-      if (data.fecha) setFecha(data.fecha);
-      if (data.familias && Array.isArray(data.familias)) {
-        setLines(data.familias.map((f: any) => ({
-          familia_nombre: f.familia_nombre || f.nombre || '',
-          unidades: Number(f.unidades) || 0,
-          importe: Number(f.importe) || 0,
-        })));
+      if (unmatched.length > 0) {
+        // Show resolution dialog
+        setPendingMatchedLines(matched);
+        setUnmatchedLines(unmatched);
+        setPendingFecha(extractedFecha);
+        setResolveMapping({});
+        setResolveOpen(true);
+      } else {
+        setFecha(extractedFecha);
+        setLines(matched);
+        toast.success('Ticket Z interpretado correctamente');
       }
-      toast.success('Ticket Z interpretado correctamente');
     } catch (err) {
       console.error('Scan error:', err);
       toast.error('Error interpretando el ticket Z');
@@ -134,7 +197,17 @@ export default function ArqueoZPage() {
     }
   };
 
-  /** Multi-scan → processes multiple images and saves each as a separate arqueo */
+  /** Confirm resolution of unmatched families for single scan */
+  const confirmResolve = () => {
+    const resolved = applyResolution(pendingMatchedLines, unmatchedLines, resolveMapping);
+    setFecha(pendingFecha);
+    setLines(resolved);
+    setResolveOpen(false);
+    setUnmatchedLines([]);
+    toast.success('Ticket Z interpretado correctamente');
+  };
+
+  /** Multi-scan → processes multiple images */
   const handleMultiScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -143,27 +216,26 @@ export default function ArqueoZPage() {
     setScanning(true);
     let saved = 0;
     let errors = 0;
+    const needsResolution: typeof pendingMultiQueue = [];
 
     for (let i = 0; i < fileArray.length; i++) {
       setScanProgress(`Procesando ${i + 1} de ${fileArray.length}...`);
       try {
         const base64 = await fileToBase64(fileArray[i]);
         const data = await processOneTicket(base64);
+        const { matched, unmatched, fecha: extractedFecha } = separateLines(data);
 
-        const extractedFamilias: FamiliaLine[] = (data.familias || []).map((f: any) => ({
-          familia_nombre: f.familia_nombre || f.nombre || '',
-          unidades: Number(f.unidades) || 0,
-          importe: Number(f.importe) || 0,
-        }));
-
-        const total = extractedFamilias.reduce((s, l) => s + l.importe, 0);
-
-        await upsertArqueo({
-          fecha: data.fecha || new Date().toISOString().slice(0, 10),
-          total_sin_iva: data.total_sin_iva || total,
-          familias: extractedFamilias,
-        });
-        saved++;
+        if (unmatched.length > 0) {
+          needsResolution.push({ matched, unmatched, fecha: extractedFecha });
+        } else {
+          const total = matched.reduce((s, l) => s + l.importe, 0);
+          await upsertArqueo({
+            fecha: extractedFecha,
+            total_sin_iva: total,
+            familias: matched.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
+          });
+          saved++;
+        }
       } catch (err) {
         console.error(`Error processing file ${fileArray[i].name}:`, err);
         errors++;
@@ -176,8 +248,51 @@ export default function ArqueoZPage() {
     setScanProgress('');
     if (multiFileRef.current) multiFileRef.current.value = '';
 
-    if (saved > 0) toast.success(`${saved} arqueo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''} correctamente`);
+    if (saved > 0) toast.success(`${saved} arqueo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''}`);
     if (errors > 0) toast.error(`${errors} ticket${errors > 1 ? 's' : ''} no se pudieron procesar`);
+
+    if (needsResolution.length > 0) {
+      setPendingMultiQueue(needsResolution);
+      // Show first one
+      const first = needsResolution[0];
+      setPendingMatchedLines(first.matched);
+      setUnmatchedLines(first.unmatched);
+      setPendingFecha(first.fecha);
+      setResolveMapping({});
+      setResolveOpen(true);
+    }
+  };
+
+  /** Confirm resolution for multi-scan queue */
+  const confirmResolveMulti = async () => {
+    const resolved = applyResolution(pendingMatchedLines, unmatchedLines, resolveMapping);
+    const total = resolved.reduce((s, l) => s + l.importe, 0);
+
+    try {
+      await upsertArqueo({
+        fecha: pendingFecha,
+        total_sin_iva: total,
+        familias: resolved.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
+      });
+      toast.success('Arqueo guardado');
+    } catch {
+      toast.error('Error guardando arqueo');
+    }
+
+    const remaining = pendingMultiQueue.slice(1);
+    if (remaining.length > 0) {
+      setPendingMultiQueue(remaining);
+      const next = remaining[0];
+      setPendingMatchedLines(next.matched);
+      setUnmatchedLines(next.unmatched);
+      setPendingFecha(next.fecha);
+      setResolveMapping({});
+    } else {
+      setPendingMultiQueue([]);
+      setResolveOpen(false);
+      setUnmatchedLines([]);
+      qc.invalidateQueries({ queryKey: ['arqueos'] });
+    }
   };
 
   const totalGlobal = arqueos.reduce((s, a) => s + (Number(a.total_sin_iva) || 0), 0);
@@ -186,12 +301,7 @@ export default function ArqueoZPage() {
     <div className="space-y-5">
       <PageHeader title="Arqueo Z" description="Registro diario de ventas por familia — tiquets Z">
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 active:scale-95"
-            onClick={() => multiFileRef.current?.click()}
-            disabled={scanning}
-          >
+          <Button variant="outline" className="gap-2 active:scale-95" onClick={() => multiFileRef.current?.click()} disabled={scanning}>
             {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Images className="h-4 w-4" />}
             {scanning ? scanProgress || 'Procesando...' : 'Escanear varios'}
           </Button>
@@ -261,13 +371,13 @@ export default function ArqueoZPage() {
         </div>
       )}
 
+      {/* Edit/New Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? 'Editar Arqueo Z' : 'Nuevo Arqueo Z'}</DialogTitle>
           </DialogHeader>
 
-          {/* Scan button */}
           <div className="flex gap-2">
             <Button variant="outline" className="gap-2 flex-1 active:scale-95" onClick={() => fileRef.current?.click()} disabled={scanning}>
               {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
@@ -291,12 +401,16 @@ export default function ArqueoZPage() {
               <div className="space-y-2">
                 {lines.map((line, idx) => (
                   <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-center">
-                    <Input
-                      placeholder="Familia"
-                      value={line.familia_nombre}
-                      onChange={e => updateLine(idx, 'familia_nombre', e.target.value)}
-                      className="bg-background text-sm"
-                    />
+                    <Select value={line.familia_nombre} onValueChange={v => updateLine(idx, 'familia_nombre', v)}>
+                      <SelectTrigger className="bg-background text-sm">
+                        <SelectValue placeholder="Familia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {familias.map(f => (
+                          <SelectItem key={f.id} value={f.nombre}>{f.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       type="number"
                       placeholder="Uds"
@@ -330,6 +444,63 @@ export default function ArqueoZPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={() => saveMut.mutate()} disabled={lines.length === 0 || saveMut.isPending} className="active:scale-95">
               {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resolve unmatched families dialog */}
+      <Dialog open={resolveOpen} onOpenChange={(open) => { if (!open) { setResolveOpen(false); setUnmatchedLines([]); setPendingMultiQueue([]); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Familias no reconocidas
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground">
+            El ticket del <strong>{pendingFecha}</strong> tiene líneas que no coinciden con las familias existentes.
+            Asigna cada una a la familia correcta:
+          </p>
+
+          <div className="space-y-3 py-2">
+            {unmatchedLines.map((line, idx) => (
+              <div key={idx} className="border border-[hsl(var(--divider))] rounded-lg p-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">"{line.nombre_ticket || line.familia_nombre}"</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{line.unidades} uds · {fmt(line.importe)}</span>
+                </div>
+                <Select value={resolveMapping[idx] || ''} onValueChange={v => setResolveMapping(prev => ({ ...prev, [idx]: v }))}>
+                  <SelectTrigger className="bg-background text-sm">
+                    <SelectValue placeholder="Asignar a familia..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {familias.map(f => (
+                      <SelectItem key={f.id} value={f.nombre}>{f.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+
+          {pendingMultiQueue.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              {pendingMultiQueue.length - 1} ticket{pendingMultiQueue.length > 2 ? 's' : ''} más pendiente{pendingMultiQueue.length > 2 ? 's' : ''} de resolver.
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResolveOpen(false); setUnmatchedLines([]); setPendingMultiQueue([]); }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={pendingMultiQueue.length > 0 ? confirmResolveMulti : confirmResolve}
+              disabled={Object.keys(resolveMapping).length < unmatchedLines.length}
+              className="active:scale-95"
+            >
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>
