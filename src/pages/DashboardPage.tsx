@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Panel de Control" description="Resumen del período seleccionado" />
+      <PageHeader title="Panel de Control" description={`Día ${diaActual} de ${diasDelMes} — gastos fijos prorrateados al ${Math.round(proporcionMes * 100)}%`} />
 
       {/* Row 1: Ventas + Compras */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-1">
