@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -35,9 +35,13 @@ export default function ArqueoZPage() {
   const [resolveMapping, setResolveMapping] = useState<Record<number, string>>({});
   const [pendingMatchedLines, setPendingMatchedLines] = useState<FamiliaLine[]>([]);
   const [pendingFecha, setPendingFecha] = useState('');
-  const [pendingMultiQueue, setPendingMultiQueue] = useState<Array<{ matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string }>>([]);
-  const [newFamiliaName, setNewFamiliaName] = useState('');
   const [creatingFamilia, setCreatingFamilia] = useState(false);
+
+  // Multi-scan: remaining files to process after resolution
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [multiScanStats, setMultiScanStats] = useState({ saved: 0, errors: 0, total: 0 });
+  const [isMultiMode, setIsMultiMode] = useState(false);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const multiFileRef = useRef<HTMLInputElement>(null);
 
@@ -108,16 +112,22 @@ export default function ArqueoZPage() {
       reader.readAsDataURL(file);
     });
 
-  const processOneTicket = async (base64: string) => {
+  /** Get fresh familias from DB (not from stale query cache) */
+  const getFreshFamilias = async () => {
+    const { data } = await supabase.from('familias').select('*').order('orden');
+    return data || [];
+  };
+
+  const processOneTicket = async (base64: string, familiaNames: string[]) => {
     const { data, error } = await supabase.functions.invoke('process-arqueo-z', {
-      body: { image_base64: base64, familias_conocidas: familias.map(f => f.nombre) },
+      body: { image_base64: base64, familias_conocidas: familiaNames },
     });
     if (error) throw error;
     return data;
   };
 
   /** Separate matched and unmatched lines from AI result */
-  const separateLines = (data: any): { matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string } => {
+  const separateLines = (data: any, currentFamilias: { nombre: string }[]): { matched: FamiliaLine[], unmatched: FamiliaLine[], fecha: string } => {
     const allLines: FamiliaLine[] = (data.familias || []).map((f: any) => ({
       familia_nombre: f.familia_nombre || f.nombre || '',
       nombre_ticket: f.nombre_ticket || f.familia_nombre || '',
@@ -126,13 +136,13 @@ export default function ArqueoZPage() {
       matched: f.matched !== false,
     }));
 
-    const familiaNames = new Set(familias.map(f => f.nombre.toLowerCase().trim()));
+    const familiaNameSet = new Set(currentFamilias.map(f => f.nombre.toLowerCase().trim()));
     
     const matched: FamiliaLine[] = [];
     const unmatched: FamiliaLine[] = [];
 
     for (const line of allLines) {
-      if (line.matched && familiaNames.has(line.familia_nombre.toLowerCase().trim())) {
+      if (line.matched && familiaNameSet.has(line.familia_nombre.toLowerCase().trim())) {
         matched.push(line);
       } else {
         line.matched = false;
@@ -149,11 +159,10 @@ export default function ArqueoZPage() {
     
     for (let i = 0; i < unmatched.length; i++) {
       const targetFamily = mapping[i];
-      if (!targetFamily) continue; // skip unmapped
+      if (!targetFamily) continue;
       
       const existingIdx = result.findIndex(r => r.familia_nombre === targetFamily);
       if (existingIdx >= 0) {
-        // Merge: add units and amount to existing family
         result[existingIdx] = {
           ...result[existingIdx],
           unidades: result[existingIdx].unidades + unmatched[i].unidades,
@@ -174,12 +183,13 @@ export default function ArqueoZPage() {
 
     setScanning(true);
     try {
+      const freshFamilias = await getFreshFamilias();
       const base64 = await fileToBase64(file);
-      const data = await processOneTicket(base64);
-      const { matched, unmatched, fecha: extractedFecha } = separateLines(data);
+      const data = await processOneTicket(base64, freshFamilias.map(f => f.nombre));
+      const { matched, unmatched, fecha: extractedFecha } = separateLines(data, freshFamilias);
 
       if (unmatched.length > 0) {
-        // Show resolution dialog
+        setIsMultiMode(false);
         setPendingMatchedLines(matched);
         setUnmatchedLines(unmatched);
         setPendingFecha(extractedFecha);
@@ -199,8 +209,8 @@ export default function ArqueoZPage() {
     }
   };
 
-  /** Confirm resolution of unmatched families for single scan */
-  const confirmResolve = () => {
+  /** Confirm resolution for single scan */
+  const confirmResolveSingle = () => {
     const resolved = applyResolution(pendingMatchedLines, unmatchedLines, resolveMapping);
     setFecha(pendingFecha);
     setLines(resolved);
@@ -209,91 +219,113 @@ export default function ArqueoZPage() {
     toast.success('Ticket Z interpretado correctamente');
   };
 
-  /** Multi-scan → processes multiple images */
+  /** Process remaining files in multi-scan queue */
+  const processRemainingFiles = async (files: File[], stats: { saved: number; errors: number; total: number }) => {
+    setScanning(true);
+    let { saved, errors, total } = stats;
+
+    for (let i = 0; i < files.length; i++) {
+      setScanProgress(`Procesando ${total - files.length + i + 1} de ${total}...`);
+      try {
+        // Always get fresh familias before each ticket (in case we just created one)
+        const freshFamilias = await getFreshFamilias();
+        const base64 = await fileToBase64(files[i]);
+        const data = await processOneTicket(base64, freshFamilias.map(f => f.nombre));
+        const { matched, unmatched, fecha: extractedFecha } = separateLines(data, freshFamilias);
+
+        if (unmatched.length > 0) {
+          // STOP here — show resolution dialog and save remaining files
+          const remainingFiles = files.slice(i + 1);
+          setPendingFiles(remainingFiles);
+          setMultiScanStats({ saved, errors, total });
+          setPendingMatchedLines(matched);
+          setUnmatchedLines(unmatched);
+          setPendingFecha(extractedFecha);
+          setResolveMapping({});
+          setIsMultiMode(true);
+          setScanning(false);
+          setScanProgress('');
+          setResolveOpen(true);
+
+          if (saved > 0) {
+            qc.invalidateQueries({ queryKey: ['arqueos'] });
+            qc.invalidateQueries({ queryKey: ['familias'] });
+          }
+          return; // Stop processing — will resume after resolution
+        }
+
+        // All matched → save directly
+        const lineTotal = matched.reduce((s, l) => s + l.importe, 0);
+        await upsertArqueo({
+          fecha: extractedFecha,
+          total_sin_iva: lineTotal,
+          familias: matched.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
+        });
+        saved++;
+      } catch (err) {
+        console.error(`Error processing file ${files[i].name}:`, err);
+        errors++;
+      }
+    }
+
+    // All done
+    qc.invalidateQueries({ queryKey: ['arqueos'] });
+    qc.invalidateQueries({ queryKey: ['familias'] });
+    setScanning(false);
+    setScanProgress('');
+    setPendingFiles([]);
+    setIsMultiMode(false);
+
+    if (saved > 0) toast.success(`${saved} arqueo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''}`);
+    if (errors > 0) toast.error(`${errors} ticket${errors > 1 ? 's' : ''} no se pudieron procesar`);
+  };
+
+  /** Multi-scan → processes multiple images one by one */
   const handleMultiScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
-    setScanning(true);
-    let saved = 0;
-    let errors = 0;
-    const needsResolution: typeof pendingMultiQueue = [];
-
-    for (let i = 0; i < fileArray.length; i++) {
-      setScanProgress(`Procesando ${i + 1} de ${fileArray.length}...`);
-      try {
-        const base64 = await fileToBase64(fileArray[i]);
-        const data = await processOneTicket(base64);
-        const { matched, unmatched, fecha: extractedFecha } = separateLines(data);
-
-        if (unmatched.length > 0) {
-          needsResolution.push({ matched, unmatched, fecha: extractedFecha });
-        } else {
-          const total = matched.reduce((s, l) => s + l.importe, 0);
-          await upsertArqueo({
-            fecha: extractedFecha,
-            total_sin_iva: total,
-            familias: matched.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
-          });
-          saved++;
-        }
-      } catch (err) {
-        console.error(`Error processing file ${fileArray[i].name}:`, err);
-        errors++;
-      }
-    }
-
-    qc.invalidateQueries({ queryKey: ['arqueos'] });
-    qc.invalidateQueries({ queryKey: ['familias'] });
-    setScanning(false);
-    setScanProgress('');
     if (multiFileRef.current) multiFileRef.current.value = '';
-
-    if (saved > 0) toast.success(`${saved} arqueo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''}`);
-    if (errors > 0) toast.error(`${errors} ticket${errors > 1 ? 's' : ''} no se pudieron procesar`);
-
-    if (needsResolution.length > 0) {
-      setPendingMultiQueue(needsResolution);
-      // Show first one
-      const first = needsResolution[0];
-      setPendingMatchedLines(first.matched);
-      setUnmatchedLines(first.unmatched);
-      setPendingFecha(first.fecha);
-      setResolveMapping({});
-      setResolveOpen(true);
-    }
+    
+    setMultiScanStats({ saved: 0, errors: 0, total: fileArray.length });
+    await processRemainingFiles(fileArray, { saved: 0, errors: 0, total: fileArray.length });
   };
 
-  /** Confirm resolution for multi-scan queue */
+  /** Confirm resolution for multi-scan — save current ticket then continue with remaining */
   const confirmResolveMulti = async () => {
     const resolved = applyResolution(pendingMatchedLines, unmatchedLines, resolveMapping);
     const total = resolved.reduce((s, l) => s + l.importe, 0);
 
+    let newSaved = multiScanStats.saved;
     try {
       await upsertArqueo({
         fecha: pendingFecha,
         total_sin_iva: total,
         familias: resolved.map(l => ({ familia_nombre: l.familia_nombre, unidades: l.unidades, importe: l.importe })),
       });
+      newSaved++;
       toast.success('Arqueo guardado');
     } catch {
       toast.error('Error guardando arqueo');
     }
 
-    const remaining = pendingMultiQueue.slice(1);
-    if (remaining.length > 0) {
-      setPendingMultiQueue(remaining);
-      const next = remaining[0];
-      setPendingMatchedLines(next.matched);
-      setUnmatchedLines(next.unmatched);
-      setPendingFecha(next.fecha);
-      setResolveMapping({});
+    setResolveOpen(false);
+    setUnmatchedLines([]);
+
+    // Refresh familias query cache before continuing
+    await qc.invalidateQueries({ queryKey: ['familias'] });
+
+    if (pendingFiles.length > 0) {
+      // Continue processing remaining files
+      const remaining = [...pendingFiles];
+      setPendingFiles([]);
+      await processRemainingFiles(remaining, { saved: newSaved, errors: multiScanStats.errors, total: multiScanStats.total });
     } else {
-      setPendingMultiQueue([]);
-      setResolveOpen(false);
-      setUnmatchedLines([]);
+      // No more files
       qc.invalidateQueries({ queryKey: ['arqueos'] });
+      setIsMultiMode(false);
+      if (newSaved > 0) toast.success(`Todos los arqueos procesados`);
     }
   };
 
@@ -452,7 +484,7 @@ export default function ArqueoZPage() {
       </Dialog>
 
       {/* Resolve unmatched families dialog */}
-      <Dialog open={resolveOpen} onOpenChange={(open) => { if (!open) { setResolveOpen(false); setUnmatchedLines([]); setPendingMultiQueue([]); } }}>
+      <Dialog open={resolveOpen} onOpenChange={(open) => { if (!open) { setResolveOpen(false); setUnmatchedLines([]); setPendingFiles([]); setIsMultiMode(false); } }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -525,18 +557,18 @@ export default function ArqueoZPage() {
             })}
           </div>
 
-          {pendingMultiQueue.length > 1 && (
+          {isMultiMode && pendingFiles.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              {pendingMultiQueue.length - 1} ticket{pendingMultiQueue.length > 2 ? 's' : ''} más pendiente{pendingMultiQueue.length > 2 ? 's' : ''} de resolver.
+              {pendingFiles.length} ticket{pendingFiles.length > 1 ? 's' : ''} más pendiente{pendingFiles.length > 1 ? 's' : ''} de procesar.
             </p>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setResolveOpen(false); setUnmatchedLines([]); setPendingMultiQueue([]); }}>
+            <Button variant="outline" onClick={() => { setResolveOpen(false); setUnmatchedLines([]); setPendingFiles([]); setIsMultiMode(false); }}>
               Cancelar
             </Button>
             <Button
-              onClick={pendingMultiQueue.length > 0 ? confirmResolveMulti : confirmResolve}
+              onClick={isMultiMode ? confirmResolveMulti : confirmResolveSingle}
               disabled={Object.keys(resolveMapping).length < unmatchedLines.length}
               className="active:scale-95"
             >
