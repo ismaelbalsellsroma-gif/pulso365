@@ -19,12 +19,19 @@ function formatLabel(desde: string, hasta: string) {
   return `${d} — ${h}`;
 }
 
-export function PeriodSelector() {
+interface Props {
+  onChange?: (desde: string, hasta: string) => void;
+}
+
+export function PeriodSelector({ onChange }: Props = {}) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const [active, setActive] = useState<Period>('mes');
-  const [desde, setDesde] = useState(toISO(monthStart));
-  const [hasta, setHasta] = useState(toISO(now));
+  const [desde, setDesdeLocal] = useState(toISO(monthStart));
+  const [hasta, setHastaLocal] = useState(toISO(now));
+
+  const setDesde = (v: string) => { setDesdeLocal(v); onChange?.(v, hasta); };
+  const setHasta = (v: string) => { setHastaLocal(v); onChange?.(desde, v); };
 
   function setPeriod(type: Period) {
     setActive(type);
