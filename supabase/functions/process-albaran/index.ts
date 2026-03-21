@@ -164,21 +164,30 @@ Presta especial atención a los importes, descuentos y totales.`;
     if (albaran_id) {
       if (fase === 1) {
         // Try to match provider in DB
+        // Try to match provider — CIF first
         let matched_proveedor_id = null;
         if (resultado.cif) {
+          const cleanCif = resultado.cif.replace(/[\s\-\.]/g, "").toUpperCase();
           const { data: prov } = await supabase
             .from("proveedores")
             .select("id")
-            .eq("cif", resultado.cif)
+            .eq("cif", cleanCif)
             .maybeSingle();
           if (prov) matched_proveedor_id = prov.id;
         }
+        // Fuzzy name match
         if (!matched_proveedor_id && resultado.nombre) {
-          const { data: provs } = await supabase
+          const { data: allProvs } = await supabase
             .from("proveedores")
-            .select("id, nombre")
-            .ilike("nombre", `%${resultado.nombre.split(" ")[0]}%`);
-          if (provs && provs.length === 1) matched_proveedor_id = provs[0].id;
+            .select("id, nombre");
+          if (allProvs) {
+            for (const p of allProvs) {
+              if (namesMatch(p.nombre, resultado.nombre)) {
+                matched_proveedor_id = p.id;
+                break;
+              }
+            }
+          }
         }
 
         await supabase.from("albaranes").update({
