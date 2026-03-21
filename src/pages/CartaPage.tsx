@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchPlatos, fetchFamilias, fetchProductos, fmt } from '@/lib/queries';
-import { upsertPlato, deletePlato } from '@/lib/mutations';
+import { upsertPlato, deletePlato, upsertProducto } from '@/lib/mutations';
 import { supabase } from '@/integrations/supabase/client';
 import { calcIngredienteCoste, calcPlatoMetrics } from '@/lib/escandallo';
-import { Plus, ChefHat, Search, Pencil, Trash2, Camera, Loader2, Check, ArrowLeft, Package, Percent, X, Copy } from 'lucide-react';
+import { Plus, ChefHat, Search, Pencil, Trash2, Camera, Loader2, Check, ArrowLeft, Package, Percent, X, Copy, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const emptyForm = { nombre: '', familia_id: '', pvp: 0, descripcion: '', iva_porcentaje: 10 };
