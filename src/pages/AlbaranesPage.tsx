@@ -1,19 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Progress } from '@/components/ui/progress';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAlbaranes } from '@/lib/queries';
 import { toast } from 'sonner';
-import { Upload, Search, Eye, Pencil, Trash2, Image, CheckSquare, Loader2, Zap } from 'lucide-react';
+import { Search, Eye, Pencil, Trash2, Image, CheckSquare, X, Plus, Save } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 const statusMap: Record<string, { label: string; className: string }> = {
@@ -30,17 +27,26 @@ function fmt(n: number | null | undefined): string {
   return (n || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
+interface EditableLine {
+  id?: string;
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  precio_unitario: number;
+  importe: number;
+  iva_pct: number;
+}
+
 export default function AlbaranesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
-  const [autoMode, setAutoMode] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [processingPhase, setProcessingPhase] = useState(0);
-  const [viewAlbaran, setViewAlbaran] = useState<Tables<'albaranes'> | null>(null);
-  const [viewLines, setViewLines] = useState<Tables<'lineas_albaran'>[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Review state
+  const [reviewAlbaran, setReviewAlbaran] = useState<Tables<'albaranes'> | null>(null);
+  const [reviewLines, setReviewLines] = useState<EditableLine[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const { data: albaranes = [], isLoading } = useQuery({
     queryKey: ['albaranes'],
@@ -67,139 +73,255 @@ export default function AlbaranesPage() {
     return matchSearch && matchStatus;
   });
 
-  // Upload file and process with AI
-  const handleUpload = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-
-    for (const file of Array.from(files)) {
-      try {
-        // 1. Upload to storage
-        const fileName = `${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('albaranes')
-          .upload(fileName, file);
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from('albaranes').getPublicUrl(fileName);
-
-        // 2. Create albaran record
-        const { data: albaran, error: insertError } = await supabase
-          .from('albaranes')
-          .insert({
-            estado: 'procesando',
-            imagen_url: urlData.publicUrl,
-            proveedor_nombre: 'Procesando…',
-          })
-          .select()
-          .single();
-        if (insertError) throw insertError;
-
-        queryClient.invalidateQueries({ queryKey: ['albaranes'] });
-
-        // 3. Convert file to base64 for AI
-        const arrayBuffer = await file.arrayBuffer();
-        const base64 = btoa(
-          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-        );
-
-        setProcessingId(albaran.id);
-
-        // Phase 1: Identify provider
-        setProcessingPhase(1);
-        const { data: fn1Data, error: fn1Error } = await supabase.functions.invoke('process-albaran', {
-          body: { albaran_id: albaran.id, fase: 1, imagen_base64: base64 },
-        });
-        if (fn1Error) throw fn1Error;
-        if (fn1Data?.error) throw new Error(fn1Data.error);
-
-        queryClient.invalidateQueries({ queryKey: ['albaranes'] });
-
-        // Phase 2: Extract data
-        setProcessingPhase(2);
-        const proveedorId = fn1Data?.resultado?.proveedor_id || undefined;
-        const { data: fn2Data, error: fn2Error } = await supabase.functions.invoke('process-albaran', {
-          body: { albaran_id: albaran.id, fase: 2, imagen_base64: base64, proveedor_id: proveedorId },
-        });
-        if (fn2Error) throw fn2Error;
-        if (fn2Data?.error) throw new Error(fn2Data.error);
-
-        // If auto mode, mark as processed directly
-        if (autoMode) {
-          await supabase.from('albaranes').update({ estado: 'procesado' }).eq('id', albaran.id);
-        }
-
-        queryClient.invalidateQueries({ queryKey: ['albaranes'] });
-        toast.success(`Albarán "${file.name}" procesado correctamente`);
-
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Error al procesar';
-        toast.error(message);
-        console.error(err);
-      }
-    }
-
-    setUploading(false);
-    setProcessingId(null);
-    setProcessingPhase(0);
-  }, [autoMode, queryClient]);
-
-  // View albaran details
-  const handleView = async (a: Tables<'albaranes'>) => {
-    setViewAlbaran(a);
+  // Open review panel
+  const handleReview = async (a: Tables<'albaranes'>) => {
+    setReviewAlbaran(a);
     const { data } = await supabase
       .from('lineas_albaran')
       .select('*')
       .eq('albaran_id', a.id);
-    setViewLines(data || []);
+    setReviewLines(
+      (data || []).map(l => ({
+        id: l.id,
+        codigo: l.codigo || '',
+        descripcion: l.descripcion,
+        cantidad: l.cantidad || 1,
+        precio_unitario: l.precio_unitario || 0,
+        importe: l.importe || 0,
+        iva_pct: l.iva_pct || 0,
+      }))
+    );
   };
 
-  // Mark as verified/processed
-  const handleVerify = async (id: string) => {
-    await supabase.from('albaranes').update({ estado: 'procesado' }).eq('id', id);
-    queryClient.invalidateQueries({ queryKey: ['albaranes'] });
-    toast.success('Albarán verificado');
-    setViewAlbaran(null);
+  // Update a line field
+  const updateLine = (idx: number, field: keyof EditableLine, value: string | number) => {
+    setReviewLines(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      // Auto-calc importe
+      if (field === 'cantidad' || field === 'precio_unitario') {
+        const cant = field === 'cantidad' ? Number(value) : updated[idx].cantidad;
+        const pu = field === 'precio_unitario' ? Number(value) : updated[idx].precio_unitario;
+        updated[idx].importe = Math.round(cant * pu * 100) / 100;
+      }
+      return updated;
+    });
   };
+
+  const addLine = () => {
+    setReviewLines(prev => [...prev, { codigo: '', descripcion: '', cantidad: 1, precio_unitario: 0, importe: 0, iva_pct: 10 }]);
+  };
+
+  const removeLine = (idx: number) => {
+    setReviewLines(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Save changes and mark as processed
+  const handleSave = async (markProcessed: boolean) => {
+    if (!reviewAlbaran) return;
+    setSaving(true);
+    try {
+      // Delete old lines
+      await supabase.from('lineas_albaran').delete().eq('albaran_id', reviewAlbaran.id);
+
+      // Insert updated lines
+      if (reviewLines.length > 0) {
+        const rows = reviewLines.map(l => ({
+          albaran_id: reviewAlbaran.id,
+          codigo: l.codigo,
+          descripcion: l.descripcion,
+          cantidad: l.cantidad,
+          precio_unitario: l.precio_unitario,
+          importe: l.importe,
+          iva_pct: l.iva_pct,
+        }));
+        const { error: lineErr } = await supabase.from('lineas_albaran').insert(rows);
+        if (lineErr) throw lineErr;
+      }
+
+      // Update total and status
+      const total = reviewLines.reduce((sum, l) => sum + (l.importe || 0), 0);
+      const { error: upErr } = await supabase.from('albaranes').update({
+        importe: Math.round(total * 100) / 100,
+        estado: markProcessed ? 'procesado' : reviewAlbaran.estado,
+      }).eq('id', reviewAlbaran.id);
+      if (upErr) throw upErr;
+
+      // Save corrections to aprendizaje if provider exists
+      if (reviewAlbaran.proveedor_id) {
+        await supabase.from('aprendizaje').insert({
+          proveedor_id: reviewAlbaran.proveedor_id,
+          tipo: 'revision',
+          descripcion: `Revisión manual del albarán ${reviewAlbaran.numero || 'SN'}: ${reviewLines.length} líneas confirmadas.`,
+          datos_despues: { lineas: reviewLines, total },
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      toast.success(markProcessed ? 'Albarán verificado y guardado' : 'Cambios guardados');
+      setReviewAlbaran(null);
+    } catch (err) {
+      toast.error('Error al guardar');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // If reviewing, show split view
+  if (reviewAlbaran) {
+    const totalLineas = reviewLines.reduce((s, l) => s + (l.importe || 0), 0);
+    return (
+      <div className="h-[calc(100vh-4rem)] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setReviewAlbaran(null)} className="p-1.5 rounded-md hover:bg-muted transition-colors active:scale-95">
+              <X className="h-5 w-5" />
+            </button>
+            <div>
+              <h2 className="font-semibold text-sm">Albarán {reviewAlbaran.numero || 'sin número'}</h2>
+              <p className="text-xs text-muted-foreground">{reviewAlbaran.proveedor_nombre} · {reviewAlbaran.fecha}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleSave(false)} disabled={saving} className="gap-1.5 active:scale-95">
+              <Save className="h-3.5 w-3.5" /> Guardar
+            </Button>
+            <Button size="sm" onClick={() => handleSave(true)} disabled={saving} className="gap-1.5 active:scale-95">
+              <CheckSquare className="h-3.5 w-3.5" /> Verificar y aprobar
+            </Button>
+          </div>
+        </div>
+
+        {/* Split view */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Image */}
+          <div className="w-1/2 border-r bg-muted/30 flex items-center justify-center overflow-auto p-4">
+            {reviewAlbaran.imagen_url ? (
+              <img
+                src={reviewAlbaran.imagen_url}
+                alt="Albarán escaneado"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+              />
+            ) : (
+              <div className="text-center text-muted-foreground">
+                <Image className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Sin imagen</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Editable lines */}
+          <div className="w-1/2 flex flex-col overflow-hidden">
+            {/* Info bar */}
+            <div className="px-4 py-3 border-b bg-card/50 flex items-center justify-between shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {reviewLines.length} líneas · Total: {fmt(totalLineas)}
+              </span>
+              <Button variant="outline" size="sm" onClick={addLine} className="gap-1.5 h-7 text-xs active:scale-95">
+                <Plus className="h-3 w-3" /> Línea
+              </Button>
+            </div>
+
+            {/* Lines */}
+            <div className="flex-1 overflow-y-auto">
+              {reviewLines.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <p className="text-sm mb-2">Sin líneas</p>
+                  <Button variant="outline" size="sm" onClick={addLine}>Añadir primera línea</Button>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {reviewLines.map((line, idx) => (
+                    <div key={idx} className="px-4 py-3 hover:bg-muted/20 transition-colors group">
+                      <div className="flex items-start gap-2">
+                        {/* Main content */}
+                        <div className="flex-1 space-y-2">
+                          {/* Row 1: code + description */}
+                          <div className="flex gap-2">
+                            <Input
+                              value={line.codigo}
+                              onChange={e => updateLine(idx, 'codigo', e.target.value)}
+                              placeholder="Ref."
+                              className="w-20 h-8 text-xs bg-transparent"
+                            />
+                            <Input
+                              value={line.descripcion}
+                              onChange={e => updateLine(idx, 'descripcion', e.target.value)}
+                              placeholder="Descripción"
+                              className="flex-1 h-8 text-xs font-medium bg-transparent"
+                            />
+                          </div>
+                          {/* Row 2: numbers */}
+                          <div className="flex gap-2 items-center">
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground w-8">Cant.</Label>
+                              <Input
+                                type="number"
+                                value={line.cantidad}
+                                onChange={e => updateLine(idx, 'cantidad', parseFloat(e.target.value) || 0)}
+                                className="w-16 h-7 text-xs tabular-nums bg-transparent"
+                                step="any"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground w-8">P.U.</Label>
+                              <Input
+                                type="number"
+                                value={line.precio_unitario}
+                                onChange={e => updateLine(idx, 'precio_unitario', parseFloat(e.target.value) || 0)}
+                                className="w-20 h-7 text-xs tabular-nums bg-transparent"
+                                step="any"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground w-8">IVA</Label>
+                              <Input
+                                type="number"
+                                value={line.iva_pct}
+                                onChange={e => updateLine(idx, 'iva_pct', parseFloat(e.target.value) || 0)}
+                                className="w-14 h-7 text-xs tabular-nums bg-transparent"
+                              />
+                              <span className="text-[10px] text-muted-foreground">%</span>
+                            </div>
+                            <div className="ml-auto text-right">
+                              <span className="text-xs font-semibold tabular-nums">{fmt(line.importe)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Delete */}
+                        <button
+                          onClick={() => removeLine(idx)}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all mt-1 active:scale-90"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer total */}
+            <div className="px-4 py-3 border-t bg-card shrink-0 flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">Total sin IVA</span>
+              <span className="text-lg font-bold tabular-nums">{fmt(totalLineas)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Albaranes" description="Gestión y procesamiento automático con IA">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Zap className={`h-4 w-4 ${autoMode ? 'text-amber-500' : 'text-muted-foreground'}`} />
-            <Label htmlFor="auto-mode" className="text-sm cursor-pointer">Auto</Label>
-            <Switch id="auto-mode" checked={autoMode} onCheckedChange={setAutoMode} />
-          </div>
-          <label className="cursor-pointer">
-            <Button className="gap-2 active:scale-95 pointer-events-none" disabled={uploading}>
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              <span className="hidden sm:inline">{uploading ? 'Procesando…' : 'Subir Albarán'}</span>
-            </Button>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              multiple
-              className="hidden"
-              onChange={e => handleUpload(e.target.files)}
-              disabled={uploading}
-            />
-          </label>
+      <PageHeader title="Albaranes" description="Recepción y verificación de albaranes">
+        <div className="text-xs text-muted-foreground text-right hidden sm:block">
+          Los albaranes llegan desde<br />la app de escaneo automáticamente
         </div>
       </PageHeader>
-
-      {/* Processing indicator */}
-      {processingId && (
-        <div className="bg-card border rounded-lg p-4 animate-fade-in-up">
-          <div className="flex items-center gap-3 mb-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span className="text-sm font-medium">
-              {processingPhase === 1 ? 'Fase 1: Identificando proveedor…' : 'Fase 2: Extrayendo datos…'}
-            </span>
-          </div>
-          <Progress value={processingPhase === 1 ? 35 : 75} className="h-1.5" />
-        </div>
-      )}
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up">
@@ -243,7 +365,7 @@ export default function AlbaranesPage() {
               ) : filtered.map((a: Tables<'albaranes'>) => {
                 const st = statusMap[a.estado || 'pendiente'] || statusMap.pendiente;
                 return (
-                  <tr key={a.id} className="border-t border-border hover:bg-muted/30 transition-colors group">
+                  <tr key={a.id} className="border-t border-border hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => handleReview(a)}>
                     <td className="px-4 py-3 tabular-nums whitespace-nowrap">{a.fecha}</td>
                     <td className="px-4 py-3 font-medium whitespace-nowrap">{a.numero || '—'}</td>
                     <td className="px-4 py-3">{a.proveedor_nombre || '—'}</td>
@@ -252,27 +374,16 @@ export default function AlbaranesPage() {
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.className}`}>{st.label}</span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                         {a.imagen_url && (
                           <a href={a.imagen_url} target="_blank" rel="noreferrer"
                             className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
                             <Image className="h-4 w-4" />
                           </a>
                         )}
-                        {(a.estado === 'pendiente_verificacion' || a.estado === 'revisar') ? (
-                          <button onClick={() => handleView(a)}
-                            className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                            <CheckSquare className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button onClick={() => handleView(a)}
-                            className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button onClick={() => handleView(a)}
+                        <button onClick={() => handleReview(a)}
                           className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                          <Eye className="h-4 w-4" />
+                          {(a.estado === 'pendiente_verificacion' || a.estado === 'revisar') ? <CheckSquare className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                         </button>
                         <button onClick={() => setDeleteId(a.id)}
                           className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors">
@@ -288,87 +399,6 @@ export default function AlbaranesPage() {
         </div>
       </div>
 
-      {/* View/Review Dialog */}
-      <Dialog open={!!viewAlbaran} onOpenChange={() => setViewAlbaran(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Albarán {viewAlbaran?.numero || 'sin número'} — {viewAlbaran?.proveedor_nombre}
-            </DialogTitle>
-          </DialogHeader>
-
-          {viewAlbaran && (
-            <div className="space-y-4">
-              {/* Image preview */}
-              {viewAlbaran.imagen_url && (
-                <div className="border rounded-lg overflow-hidden max-h-64">
-                  <img src={viewAlbaran.imagen_url} alt="Albarán" className="w-full object-contain max-h-64" />
-                </div>
-              )}
-
-              {/* General info */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{viewAlbaran.fecha}</span></div>
-                <div><span className="text-muted-foreground">Número:</span> <span className="font-medium">{viewAlbaran.numero || '—'}</span></div>
-                <div><span className="text-muted-foreground">Proveedor:</span> <span className="font-medium">{viewAlbaran.proveedor_nombre || '—'}</span></div>
-                <div><span className="text-muted-foreground">Importe:</span> <span className="font-semibold">{fmt(viewAlbaran.importe)}</span></div>
-              </div>
-
-              {/* Line items */}
-              {viewLines.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Líneas ({viewLines.length})</h4>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-muted/50">
-                          <th className="px-3 py-2 text-left">Descripción</th>
-                          <th className="px-3 py-2 text-right">Cant.</th>
-                          <th className="px-3 py-2 text-right">P.Unit.</th>
-                          <th className="px-3 py-2 text-right">Importe</th>
-                          <th className="px-3 py-2 text-right">IVA</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {viewLines.map(l => (
-                          <tr key={l.id} className="border-t border-border">
-                            <td className="px-3 py-2">{l.descripcion}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{l.cantidad}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{fmt(l.precio_unitario)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-medium">{fmt(l.importe)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{l.iva_pct}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* AI data dump */}
-              {viewAlbaran.datos_ia && Object.keys(viewAlbaran.datos_ia as object).length > 0 && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Datos IA (debug)</summary>
-                  <pre className="mt-2 bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">
-                    {JSON.stringify(viewAlbaran.datos_ia, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setViewAlbaran(null)}>Cerrar</Button>
-            {viewAlbaran && (viewAlbaran.estado === 'pendiente_verificacion' || viewAlbaran.estado === 'revisar') && (
-              <Button onClick={() => handleVerify(viewAlbaran.id)} className="gap-2">
-                <CheckSquare className="h-4 w-4" /> Verificar y aprobar
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete dialog */}
       <DeleteDialog
         open={!!deleteId}
         onOpenChange={() => setDeleteId(null)}
