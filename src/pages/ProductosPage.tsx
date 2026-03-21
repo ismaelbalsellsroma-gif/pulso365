@@ -67,8 +67,9 @@ export default function ProductosPage() {
         unidad: form.unidad,
         precio_actual: Number(form.precio_actual),
         proveedor_nombre: form.proveedor_nombre,
+        contenido_neto: form.contenido_neto ? parseFloat(form.contenido_neto) : null,
+        contenido_unidad: form.contenido_neto ? form.contenido_unidad : null,
       };
-      // Save categoria_id directly
       if (form.categoria_id) {
         payload.categoria_id = form.categoria_id;
       } else {
