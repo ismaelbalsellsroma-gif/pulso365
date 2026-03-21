@@ -128,15 +128,37 @@ serve(async (req) => {
       // 4. Insert line items
       if (lineas.length > 0 && albaran) {
         const rows = lineas.map(
-          (l: Record<string, unknown>) => ({
-            albaran_id: albaran.id,
-            codigo: (l.referencia as string) || "",
-            descripcion: (l.descripcion as string) || "",
-            cantidad: (l.cantidad as number) || 1,
-            precio_unitario: (l.precio_unitario as number) || 0,
-            importe: (l.importe as number) || 0,
-            iva_pct: (l.iva_pct as number) || 0,
-          })
+          (l: Record<string, unknown>) => {
+            let pu = Number(l.precio_unitario) || 0;
+            const cant = Number(l.cantidad) || 1;
+            const imp = Number(l.importe) || 0;
+
+            // Detect precio_unitario in thousandths (milésimas):
+            // If pu > 100 and dividing by 1000 gives a value close to importe/cantidad, normalize
+            if (pu > 100) {
+              const puNorm = pu / 1000;
+              const expectedFromImp = cant > 0 ? imp / cant : 0;
+              // If ÷1000 is within 15% of importe/cantidad, use normalized value
+              if (expectedFromImp > 0 && Math.abs(puNorm - expectedFromImp) / expectedFromImp < 0.15) {
+                pu = puNorm;
+              } else if (expectedFromImp > 0) {
+                // Fallback: derive from importe / cantidad (most reliable)
+                pu = Math.round(expectedFromImp * 10000) / 10000;
+              } else {
+                pu = puNorm; // Default: assume thousandths
+              }
+            }
+
+            return {
+              albaran_id: albaran.id,
+              codigo: (l.referencia as string) || "",
+              descripcion: (l.descripcion as string) || "",
+              cantidad: cant,
+              precio_unitario: pu,
+              importe: imp,
+              iva_pct: Number(l.iva_pct) || 0,
+            };
+          }
         );
         await supabase.from("lineas_albaran").insert(rows);
       }
