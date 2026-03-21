@@ -6,6 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Normaliza texto para comparaciones */
+function normalizeName(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const wa = na.split(" ").slice(0, 2).join(" ");
+  const wb = nb.split(" ").slice(0, 2).join(" ");
+  if (wa.length >= 4 && wa === wb) return true;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -147,21 +164,30 @@ Presta especial atención a los importes, descuentos y totales.`;
     if (albaran_id) {
       if (fase === 1) {
         // Try to match provider in DB
+        // Try to match provider — CIF first
         let matched_proveedor_id = null;
         if (resultado.cif) {
+          const cleanCif = resultado.cif.replace(/[\s\-\.]/g, "").toUpperCase();
           const { data: prov } = await supabase
             .from("proveedores")
             .select("id")
-            .eq("cif", resultado.cif)
+            .eq("cif", cleanCif)
             .maybeSingle();
           if (prov) matched_proveedor_id = prov.id;
         }
+        // Fuzzy name match
         if (!matched_proveedor_id && resultado.nombre) {
-          const { data: provs } = await supabase
+          const { data: allProvs } = await supabase
             .from("proveedores")
-            .select("id, nombre")
-            .ilike("nombre", `%${resultado.nombre.split(" ")[0]}%`);
-          if (provs && provs.length === 1) matched_proveedor_id = provs[0].id;
+            .select("id, nombre");
+          if (allProvs) {
+            for (const p of allProvs) {
+              if (namesMatch(p.nombre, resultado.nombre)) {
+                matched_proveedor_id = p.id;
+                break;
+              }
+            }
+          }
         }
 
         await supabase.from("albaranes").update({
