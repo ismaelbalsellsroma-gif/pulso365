@@ -149,12 +149,12 @@ export default function AlbaranesPage() {
 
       // Save corrections to aprendizaje if provider exists
       if (reviewAlbaran.proveedor_id) {
-        await supabase.from('aprendizaje').insert({
+        await supabase.from('aprendizaje').insert([{
           proveedor_id: reviewAlbaran.proveedor_id,
           tipo: 'revision',
           descripcion: `Revisión manual del albarán ${reviewAlbaran.numero || 'SN'}: ${reviewLines.length} líneas confirmadas.`,
-          datos_despues: { lineas: reviewLines, total },
-        });
+          datos_despues: { lineas: reviewLines, total } as unknown as Record<string, unknown>,
+        }]);
       }
 
       queryClient.invalidateQueries({ queryKey: ['albaranes'] });
