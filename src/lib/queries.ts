@@ -100,3 +100,12 @@ export async function fetchAjustes() {
   if (error) throw error;
   return data;
 }
+
+export async function fetchPlatos() {
+  const { data, error } = await supabase
+    .from('platos')
+    .select('*, plato_ingredientes(*)')
+    .order('nombre');
+  if (error) throw error;
+  return data;
+}
