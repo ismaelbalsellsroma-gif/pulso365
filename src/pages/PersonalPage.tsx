@@ -1,18 +1,54 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchPersonal, fmt } from '@/lib/queries';
-import { Plus, UserCircle } from 'lucide-react';
+import { upsertPersonal, deletePersonal } from '@/lib/mutations';
+import { Plus, UserCircle, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const emptyForm = { nombre: '', dni: '', coste_mensual: 0, activo: true };
 
 export default function PersonalPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const qc = useQueryClient();
   const { data: personal = [], isLoading } = useQuery({ queryKey: ['personal'], queryFn: fetchPersonal });
   const activos = personal.filter(e => e.activo);
   const totalCoste = activos.reduce((s, e) => s + Number(e.coste_mensual || 0), 0);
 
+  const saveMut = useMutation({
+    mutationFn: () => upsertPersonal({ id: editId || undefined, ...form }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['personal'] }); setDialogOpen(false); toast.success(editId ? 'Empleado actualizado' : 'Empleado añadido'); },
+    onError: () => toast.error('Error guardando empleado'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: () => deletePersonal(deleteId!),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['personal'] }); setDeleteOpen(false); toast.success('Empleado eliminado'); },
+    onError: () => toast.error('Error eliminando empleado'),
+  });
+
+  const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (e: any) => {
+    setEditId(e.id);
+    setForm({ nombre: e.nombre, dni: e.dni || '', coste_mensual: Number(e.coste_mensual || 0), activo: e.activo ?? true });
+    setDialogOpen(true);
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader title="Personal" description="Gestión de empleados y costes de personal">
-        <Button className="gap-2 active:scale-95"><Plus className="h-4 w-4" /> Añadir Empleado</Button>
+        <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Añadir Empleado</Button>
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-up">
@@ -42,6 +78,7 @@ export default function PersonalPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">DNI</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Coste mensual</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estado</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground w-20">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -57,6 +94,12 @@ export default function PersonalPage() {
                         {e.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => openEdit(e)} className="p-1.5 rounded-md text-muted-foreground hover:bg-[hsl(var(--surface-offset))] hover:text-foreground transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => { setDeleteId(e.id); setDeleteOpen(true); }} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -64,6 +107,42 @@ export default function PersonalPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Editar Empleado' : 'Nuevo Empleado'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold">Nombre *</Label>
+              <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} className="mt-1.5 bg-background" maxLength={100} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-semibold">DNI</Label>
+                <Input value={form.dni} onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} className="mt-1.5 bg-background" maxLength={20} />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Coste mensual (€)</Label>
+                <Input type="number" min={0} step={0.01} value={form.coste_mensual} onChange={e => setForm(f => ({ ...f, coste_mensual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.activo} onCheckedChange={v => setForm(f => ({ ...f, activo: v }))} />
+              <Label className="text-sm">{form.activo ? 'Activo' : 'Inactivo'}</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => saveMut.mutate()} disabled={!form.nombre.trim() || saveMut.isPending} className="active:scale-95">
+              {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={() => delMut.mutate()} isPending={delMut.isPending} title="¿Eliminar empleado?" />
     </div>
   );
 }
