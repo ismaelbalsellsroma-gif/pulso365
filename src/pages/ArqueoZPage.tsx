@@ -463,70 +463,66 @@ export default function ArqueoZPage() {
 
           <p className="text-sm text-muted-foreground">
             El ticket del <strong>{pendingFecha}</strong> tiene líneas que no coinciden con las familias existentes.
-            Asigna cada una a la familia correcta:
+            Asigna cada una a la familia correcta o crea una nueva:
           </p>
 
           <div className="space-y-3 py-2">
-            {unmatchedLines.map((line, idx) => (
-              <div key={idx} className="border border-[hsl(var(--divider))] rounded-lg p-3 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">"{line.nombre_ticket || line.familia_nombre}"</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{line.unidades} uds · {fmt(line.importe)}</span>
-                </div>
-                <Select value={resolveMapping[idx] || ''} onValueChange={v => setResolveMapping(prev => ({ ...prev, [idx]: v }))}>
-                  <SelectTrigger className="bg-background text-sm">
-                    <SelectValue placeholder="Asignar a familia..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {familias.map(f => (
-                      <SelectItem key={f.id} value={f.nombre}>{f.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
+            {unmatchedLines.map((line, idx) => {
+              const suggestedName = (line.nombre_ticket || line.familia_nombre || '').toUpperCase().trim();
+              const currentValue = resolveMapping[idx] || '';
 
-          {/* Crear nueva familia inline */}
-          <div className="border border-dashed border-[hsl(var(--divider))] rounded-lg p-3 space-y-2">
-            <p className="text-xs text-muted-foreground">¿No encuentras la familia? Créala aquí:</p>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nombre de la nueva familia"
-                value={newFamiliaName}
-                onChange={e => setNewFamiliaName(e.target.value.toUpperCase())}
-                className="bg-background text-sm flex-1"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!newFamiliaName.trim() || creatingFamilia}
-                className="gap-1 active:scale-95"
-                onClick={async () => {
-                  const name = newFamiliaName.trim();
-                  if (!name) return;
-                  // Check duplicate
-                  if (familias.some(f => f.nombre.toLowerCase() === name.toLowerCase())) {
-                    toast.error('Esa familia ya existe');
-                    return;
-                  }
-                  setCreatingFamilia(true);
-                  try {
-                    await supabase.from('familias').insert({ nombre: name, orden: familias.length });
-                    await qc.invalidateQueries({ queryKey: ['familias'] });
-                    setNewFamiliaName('');
-                    toast.success(`Familia "${name}" creada`);
-                  } catch {
-                    toast.error('Error creando familia');
-                  } finally {
-                    setCreatingFamilia(false);
-                  }
-                }}
-              >
-                <PlusCircle className="h-3.5 w-3.5" />
-                Crear
-              </Button>
-            </div>
+              return (
+                <div key={idx} className="border border-[hsl(var(--divider))] rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">"{line.nombre_ticket || line.familia_nombre}"</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{line.unidades} uds · {fmt(line.importe)}</span>
+                  </div>
+
+                  <Select
+                    value={currentValue}
+                    onValueChange={async (v) => {
+                      if (v === `__create__${idx}`) {
+                        const name = suggestedName;
+                        if (!name) return;
+                        if (familias.some(f => f.nombre.toLowerCase() === name.toLowerCase())) {
+                          setResolveMapping(prev => ({ ...prev, [idx]: name }));
+                          toast.info(`"${name}" ya existe, asignada automáticamente`);
+                          return;
+                        }
+                        setCreatingFamilia(true);
+                        try {
+                          await supabase.from('familias').insert({ nombre: name, orden: familias.length });
+                          await qc.invalidateQueries({ queryKey: ['familias'] });
+                          setResolveMapping(prev => ({ ...prev, [idx]: name }));
+                          toast.success(`Familia "${name}" creada`);
+                        } catch {
+                          toast.error('Error creando familia');
+                        } finally {
+                          setCreatingFamilia(false);
+                        }
+                      } else {
+                        setResolveMapping(prev => ({ ...prev, [idx]: v }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background text-sm">
+                      <SelectValue placeholder="Asignar a familia..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {familias.map(f => (
+                        <SelectItem key={f.id} value={f.nombre}>{f.nombre}</SelectItem>
+                      ))}
+                      <SelectItem value={`__create__${idx}`} className="text-primary font-medium border-t border-[hsl(var(--divider))] mt-1">
+                        <span className="flex items-center gap-1.5">
+                          <PlusCircle className="h-3.5 w-3.5" />
+                          Crear "{suggestedName}"
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })}
           </div>
 
           {pendingMultiQueue.length > 1 && (
