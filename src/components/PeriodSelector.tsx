@@ -35,18 +35,20 @@ export function PeriodSelector({ onChange }: Props = {}) {
 
   function setPeriod(type: Period) {
     setActive(type);
+    let d = desde, h = toISO(now);
     if (type === 'hoy') {
-      const t = toISO(now);
-      setDesde(t); setHasta(t);
+      d = toISO(now); h = toISO(now);
     } else if (type === 'semana') {
       const day = now.getDay();
       const diff = day === 0 ? 6 : day - 1;
       const monday = new Date(now);
       monday.setDate(now.getDate() - diff);
-      setDesde(toISO(monday)); setHasta(toISO(now));
+      d = toISO(monday);
     } else if (type === 'mes') {
-      setDesde(toISO(monthStart)); setHasta(toISO(now));
+      d = toISO(monthStart);
     }
+    setDesdeLocal(d); setHastaLocal(h);
+    onChange?.(d, h);
   }
 
   const chips: { label: string; value: Period }[] = [
