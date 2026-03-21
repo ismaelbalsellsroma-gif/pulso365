@@ -191,3 +191,41 @@ export async function deletePlato(id: string) {
   const { error } = await supabase.from('platos').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ─── Arqueos Z ───
+export async function upsertArqueo(data: {
+  id?: string;
+  fecha: string;
+  total_sin_iva: number;
+  familias: { familia_nombre: string; unidades: number; importe: number }[];
+}) {
+  const { id, familias, ...rest } = data;
+
+  if (id) {
+    const { error } = await supabase.from('arqueos_z').update(rest).eq('id', id);
+    if (error) throw error;
+    // Delete old familia lines and re-insert
+    await supabase.from('arqueo_familias').delete().eq('arqueo_id', id);
+    if (familias.length > 0) {
+      const { error: fErr } = await supabase.from('arqueo_familias').insert(
+        familias.map(f => ({ arqueo_id: id, ...f }))
+      );
+      if (fErr) throw fErr;
+    }
+  } else {
+    const { data: inserted, error } = await supabase.from('arqueos_z').insert(rest).select('id').single();
+    if (error) throw error;
+    if (familias.length > 0) {
+      const { error: fErr } = await supabase.from('arqueo_familias').insert(
+        familias.map(f => ({ arqueo_id: inserted.id, ...f }))
+      );
+      if (fErr) throw fErr;
+    }
+  }
+}
+
+export async function deleteArqueo(id: string) {
+  await supabase.from('arqueo_familias').delete().eq('arqueo_id', id);
+  const { error } = await supabase.from('arqueos_z').delete().eq('id', id);
+  if (error) throw error;
+}
