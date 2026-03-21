@@ -19,7 +19,14 @@ serve(async (req) => {
 Extrae la información del ticket Z en la imagen. Devuelve la información usando la tool proporcionada.
 Familias conocidas del negocio: ${familiasList}
 Intenta mapear cada línea del ticket a una de las familias conocidas. Si no coincide, usa el nombre tal cual aparece.
-Presta atención a los decimales: el formato español usa comas como separador decimal.`;
+Presta atención a los decimales: el formato español usa comas como separador decimal.
+
+MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible). 
+- Si el ticket muestra importes con IVA incluido, debes calcular y devolver el importe SIN IVA.
+- Si el ticket ya desglosa base imponible e IVA, usa la base imponible directamente.
+- El IVA en restauración suele ser del 10% para comida y bebida, y 21% para alcohol destilado.
+- El total_sin_iva debe ser la suma de todos los importes sin IVA.
+- Si ves un total con IVA y no hay desglose, divide entre 1.10 para obtener la base imponible.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
