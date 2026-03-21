@@ -30,10 +30,15 @@ export default function ProductosPage() {
   const [catProductName, setCatProductName] = useState('');
   const [selectedSubcatId, setSelectedSubcatId] = useState('');
 
-  // Inline new subcategory creation
+  // Inline new subcategory/category creation
   const [newSubOpen, setNewSubOpen] = useState(false);
   const [newSubName, setNewSubName] = useState('');
   const [newSubCatId, setNewSubCatId] = useState('');
+  // Create new category inline
+  const [newCatMode, setNewCatMode] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('📦');
+  const [newCatTipo, setNewCatTipo] = useState('otro');
 
   const qc = useQueryClient();
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
