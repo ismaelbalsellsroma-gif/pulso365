@@ -32,6 +32,14 @@ export default function CategoriasPage() {
 
   const qc = useQueryClient();
   const { data: categorias = [], isLoading } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
+  const { data: productos = [] } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
+
+  // Count products per category
+  const productosPerCat = (catId: string) => {
+    const prods = productos.filter(p => p.categoria_id === catId);
+    return { count: prods.length, total: prods.reduce((s, p) => s + (Number(p.precio_actual) || 0), 0) };
+  };
+  const sinCategoria = productos.filter(p => !p.categoria_id).length;
 
   const saveMut = useMutation({
     mutationFn: async () => {
