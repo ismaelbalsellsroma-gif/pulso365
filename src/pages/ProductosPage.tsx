@@ -81,7 +81,7 @@ export default function ProductosPage() {
       .filter(Boolean)
       .sort((a, b) => b.fecha.localeCompare(a.fecha));
   }, [detailProductId, preciosHistorico, albaranMap]);
-  }, [detailProductId, lineasAlbaran, albaranMap, productos]);
+  
 
   // Build categoria id -> name map
   const catMap: Record<string, { nombre: string; icon: string }> = {};
