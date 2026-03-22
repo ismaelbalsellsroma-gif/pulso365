@@ -30,10 +30,7 @@ REGLAS OBLIGATORIAS:
 
 Presta atención a los decimales: el formato español usa comas como separador decimal.
 
-MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
-- SIEMPRE divide los importes entre 1.10 para obtener la base imponible.
-- El IVA es SIEMPRE del 10% para TODOS los conceptos sin excepción.
-- El total_sin_iva debe ser la suma de todos los importes ya divididos entre 1.10.`;
+MUY IMPORTANTE: Devuelve los importes TAL COMO aparecen en el ticket (CON IVA). NO dividas ni modifiques los importes. El sistema quitará el IVA automáticamente.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -112,6 +109,18 @@ MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
     }
 
     const extracted = JSON.parse(toolCall.function.arguments);
+
+    // Remove IVA in code (divide by 1.10) — never trust AI to do math
+    const IVA_DIVISOR = 1.10;
+    if (extracted.familias) {
+      extracted.familias = extracted.familias.map((f: any) => ({
+        ...f,
+        importe: Math.round((f.importe / IVA_DIVISOR) * 100) / 100,
+      }));
+    }
+    extracted.total_sin_iva = Math.round(
+      (extracted.familias || []).reduce((s: number, f: any) => s + f.importe, 0) * 100
+    ) / 100;
 
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
