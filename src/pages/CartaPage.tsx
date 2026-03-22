@@ -718,7 +718,7 @@ export default function CartaPage() {
             <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos.</p>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">Selecciona los platos que quieres importar. Se encontraron <strong>{scannedPlatos.length}</strong> platos.</p>
+              <p className="text-sm text-muted-foreground">Selecciona los platos que quieres importar. Se encontraron <strong>{scannedPlatos.length}</strong> platos. Los precios (con IVA) se convertirán automáticamente a sin IVA.</p>
               <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
                 {scannedPlatos.map((p, idx) => (
                   <div key={idx} onClick={() => toggleScanned(idx)}
