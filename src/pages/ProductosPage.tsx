@@ -266,7 +266,7 @@ export default function ProductosPage() {
                     <tr
                       key={p.id}
                       className={`border-t border-[hsl(var(--divider))] hover:bg-[hsl(var(--surface-offset))] transition-colors group cursor-pointer ${noCat ? 'bg-amber-500/[0.06]' : ''}`}
-                      onClick={() => openEdit(p)}
+                      onClick={() => setDetailProductId(p.id)}
                     >
                       <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{p.referencia || '—'}</td>
                       <td className="px-4 py-3 font-medium">{p.nombre}</td>
