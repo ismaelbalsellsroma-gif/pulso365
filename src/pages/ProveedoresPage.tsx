@@ -33,6 +33,7 @@ function getInitials(name: string) {
 const emptyForm = { nombre: '', cif: '', contacto: '', telefono: '', email: '', tipos: [] as string[] };
 
 export default function ProveedoresPage() {
+  const nav = useNavigate();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
