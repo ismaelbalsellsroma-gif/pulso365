@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ interface AlbaranExtra {
 }
 
 export default function AlbaranesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -71,6 +73,18 @@ export default function AlbaranesPage() {
     queryKey: ['albaranes'],
     queryFn: fetchAlbaranes,
   });
+
+  // Auto-open albarán from URL param ?id=xxx
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id && albaranes.length > 0 && !reviewAlbaran) {
+      const found = albaranes.find(a => a.id === id);
+      if (found) {
+        handleReview(found);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [albaranes, searchParams]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {

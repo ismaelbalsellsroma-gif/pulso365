@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { DeleteDialog } from '@/components/DeleteDialog';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { fetchProveedores, fetchAlbaranes, fmt } from '@/lib/queries';
 import { upsertProveedor, deleteProveedor } from '@/lib/mutations';
-import { Plus, Search, Phone, Mail, Pencil, Trash2, FileText, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Pencil, Trash2, FileText, AlertTriangle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -32,6 +33,7 @@ function getInitials(name: string) {
 const emptyForm = { nombre: '', cif: '', contacto: '', telefono: '', email: '', tipos: [] as string[] };
 
 export default function ProveedoresPage() {
+  const nav = useNavigate();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -56,16 +58,15 @@ export default function ProveedoresPage() {
   const periodoEnd = endOfMonth(periodoStart);
 
   const albaranesPorProveedor = useMemo(() => {
-    const map: Record<string, { fecha: string; numero: string | null; importe: number }[]> = {};
+    const map: Record<string, { id: string; fecha: string; numero: string | null; importe: number }[]> = {};
     for (const a of albaranes) {
       if (!a.proveedor_id) continue;
       const fecha = parseISO(a.fecha);
       if (fecha >= periodoStart && fecha <= periodoEnd) {
         if (!map[a.proveedor_id]) map[a.proveedor_id] = [];
-        map[a.proveedor_id].push({ fecha: a.fecha, numero: a.numero, importe: Number(a.importe) || 0 });
+        map[a.proveedor_id].push({ id: a.id, fecha: a.fecha, numero: a.numero, importe: Number(a.importe) || 0 });
       }
     }
-    // Sort each group by date desc
     for (const key of Object.keys(map)) {
       map[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
     }
@@ -200,14 +201,21 @@ export default function ProveedoresPage() {
                   </button>
 
                   {isExpanded && provAlbaranes.length > 0 && (
-                    <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                    <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
                       {provAlbaranes.map((a, i) => (
-                        <div key={i} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-[hsl(var(--surface-offset))]">
-                          <span className="text-muted-foreground">
+                        <button
+                          key={i}
+                          onClick={() => nav(`/albaranes?id=${a.id}`)}
+                          className="w-full flex items-center justify-between text-[11px] px-2 py-1.5 rounded bg-[hsl(var(--surface-offset))] hover:bg-primary/10 hover:text-primary transition-colors group/alb cursor-pointer"
+                        >
+                          <span className="text-muted-foreground group-hover/alb:text-primary transition-colors">
                             {format(parseISO(a.fecha), 'dd/MM/yyyy')} {a.numero ? `#${a.numero}` : ''}
                           </span>
-                          <span className="font-medium tabular-nums">{fmt(a.importe)}</span>
-                        </div>
+                          <span className="flex items-center gap-1.5">
+                            <span className="font-medium tabular-nums">{fmt(a.importe)}</span>
+                            <ExternalLink className="h-3 w-3 opacity-0 group-hover/alb:opacity-100 transition-opacity" />
+                          </span>
+                        </button>
                       ))}
                     </div>
                   )}
