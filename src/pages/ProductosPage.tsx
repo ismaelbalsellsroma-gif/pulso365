@@ -46,47 +46,41 @@ export default function ProductosPage() {
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
   const { data: albaranes = [] } = useQuery({ queryKey: ['albaranes'], queryFn: fetchAlbaranes });
 
-  // Fetch lineas_albaran for the detail product
-  const { data: lineasAlbaran = [] } = useQuery({
-    queryKey: ['lineas_albaran_producto', detailProductId],
+  // Fetch precios_historico for the detail product (direct producto_id → albaran_id link)
+  const { data: preciosHistorico = [] } = useQuery({
+    queryKey: ['precios_historico_producto', detailProductId],
     queryFn: async () => {
       if (!detailProductId) return [];
-      // Find product name for matching
-      const prod = productos.find(p => p.id === detailProductId);
-      if (!prod) return [];
       const { data, error } = await supabase
-        .from('lineas_albaran')
+        .from('precios_historico')
         .select('*')
-        .ilike('descripcion', `%${prod.nombre_normalizado}%`)
-        .order('albaran_id');
+        .eq('producto_id', detailProductId)
+        .order('fecha', { ascending: false });
       if (error) throw error;
       return data || [];
     },
     enabled: !!detailProductId,
   });
 
-  // Map lineas to their albaranes
+  // Map albaranes by id
   const albaranMap = useMemo(() => {
     const map: Record<string, typeof albaranes[0]> = {};
     for (const a of albaranes) map[a.id] = a;
     return map;
   }, [albaranes]);
 
+  // Albaranes where this product appeared
   const productoAlbaranes = useMemo(() => {
     if (!detailProductId) return [];
-    const prod = productos.find(p => p.id === detailProductId);
-    if (!prod) return [];
-    
-    // Match by proveedor_nombre + product name in lineas, or by precios_historico
     const albIds = new Set<string>();
-    for (const l of lineasAlbaran) {
-      albIds.add(l.albaran_id);
+    for (const ph of preciosHistorico) {
+      if (ph.albaran_id) albIds.add(ph.albaran_id);
     }
-    
     return Array.from(albIds)
       .map(id => albaranMap[id])
       .filter(Boolean)
       .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [detailProductId, preciosHistorico, albaranMap]);
   }, [detailProductId, lineasAlbaran, albaranMap, productos]);
 
   // Build categoria id -> name map
