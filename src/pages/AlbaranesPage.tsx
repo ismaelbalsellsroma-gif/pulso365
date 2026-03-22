@@ -567,7 +567,8 @@ export default function AlbaranesPage() {
 
       <div className="bg-card border rounded-lg overflow-hidden animate-fade-in-up animate-delay-1">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          {/* Desktop table */}
+          <table className="w-full text-sm hidden md:table">
             <thead>
               <tr className="bg-muted/50">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fecha</th>
@@ -617,6 +618,44 @@ export default function AlbaranesPage() {
               })}
             </tbody>
           </table>
+
+          {/* Mobile card list */}
+          <div className="md:hidden divide-y">
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">Cargando…</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">No se encontraron albaranes</div>
+            ) : filtered.map((a: Tables<'albaranes'>) => {
+              const st = statusMap[a.estado || 'pendiente'] || statusMap.pendiente;
+              return (
+                <div key={a.id} className="px-3 py-3 active:bg-muted/30 transition-colors cursor-pointer" onClick={() => handleReview(a)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">{a.proveedor_nombre || '—'}</span>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${st.className}`}>{st.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                        <span className="tabular-nums">{a.fecha}</span>
+                        {a.numero && <span>· Nº {a.numero}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-semibold text-sm tabular-nums">{fmt(a.importe)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-1 mt-1.5" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleReview(a)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground">
+                      {(a.estado === 'pendiente_verificacion' || a.estado === 'revisar') ? <CheckSquare className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                    </button>
+                    <button onClick={() => setDeleteId(a.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

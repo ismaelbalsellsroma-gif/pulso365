@@ -56,69 +56,69 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       <PageHeader title="Panel de Control" description={`Día ${diaActual} de ${diasDelMes} — gastos fijos prorrateados al ${Math.round(proporcionMes * 100)}%`} />
 
       {/* Row 1: Ventas + Compras */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 animate-fade-in-up animate-delay-1">
         <div className="panel-card panel-ventas">
-          <div className="panel-card-header"><DollarSign className="h-5 w-5" /><span>Ventas</span></div>
-          <div className="panel-card-value">{fmt(ventas)}</div>
+          <div className="panel-card-header"><DollarSign className="h-4 w-4 md:h-5 md:w-5" /><span>Ventas</span></div>
+          <div className="panel-card-value text-xl md:text-3xl">{fmt(ventas)}</div>
           <div className="panel-card-sub">sin IVA · {arqueos.length} arqueos</div>
         </div>
         <div className="panel-card panel-compras">
-          <div className="panel-card-header"><ShoppingCart className="h-5 w-5" /><span>Compras</span></div>
-          <div className="panel-card-value">{fmt(comprasTotal)}</div>
+          <div className="panel-card-header"><ShoppingCart className="h-4 w-4 md:h-5 md:w-5" /><span>Compras</span></div>
+          <div className="panel-card-value text-xl md:text-3xl">{fmt(comprasTotal)}</div>
           <div className="panel-card-sub">{pct(comprasTotal)}% sobre ventas · {albaranes.length} albaranes</div>
         </div>
       </div>
 
       {/* Row 2: Fixed costs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up animate-delay-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up animate-delay-2">
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/personal')}>
-          <div className="panel-card-header"><Users className="h-5 w-5" /><span>Personal</span></div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(personalTotal)}</div>
-          <div className="panel-card-sub">{pct(personalTotal)}% sobre ventas</div>
+          <div className="panel-card-header"><Users className="h-4 w-4" /><span className="truncate">Personal</span></div>
+          <div className="panel-card-value text-lg md:text-2xl">{fmt(personalTotal)}</div>
+          <div className="panel-card-sub">{pct(personalTotal)}%</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/alquiler')}>
-          <div className="panel-card-header"><Home className="h-5 w-5" /><span>Alquiler</span></div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(alquilerTotal)}</div>
-          <div className="panel-card-sub">{pct(alquilerTotal)}% sobre ventas</div>
+          <div className="panel-card-header"><Home className="h-4 w-4" /><span className="truncate">Alquiler</span></div>
+          <div className="panel-card-value text-lg md:text-2xl">{fmt(alquilerTotal)}</div>
+          <div className="panel-card-sub">{pct(alquilerTotal)}%</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/bancos')}>
-          <div className="panel-card-header"><CreditCard className="h-5 w-5" /><span>Bancos</span></div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(bancosTotal)}</div>
-          <div className="panel-card-sub">{pct(bancosTotal)}% sobre ventas</div>
+          <div className="panel-card-header"><CreditCard className="h-4 w-4" /><span className="truncate">Bancos</span></div>
+          <div className="panel-card-value text-lg md:text-2xl">{fmt(bancosTotal)}</div>
+          <div className="panel-card-sub">{pct(bancosTotal)}%</div>
         </div>
         <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/suministros')}>
-          <div className="panel-card-header"><Zap className="h-5 w-5" /><span>Suministros</span></div>
-          <div className="panel-card-value text-xl md:text-2xl">{fmt(suministrosTotal)}</div>
-          <div className="panel-card-sub">{pct(suministrosTotal)}% sobre ventas</div>
+          <div className="panel-card-header"><Zap className="h-4 w-4" /><span className="truncate">Suministros</span></div>
+          <div className="panel-card-value text-lg md:text-2xl">{fmt(suministrosTotal)}</div>
+          <div className="panel-card-sub">{pct(suministrosTotal)}%</div>
         </div>
       </div>
 
       {/* Resultado */}
       <div className={`panel-resultado ${positivo ? 'positivo' : 'negativo'} animate-fade-in-up animate-delay-3`}>
         <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-          {positivo ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+          {positivo ? <TrendingUp className="h-4 w-4 md:h-5 md:w-5" /> : <TrendingDown className="h-4 w-4 md:h-5 md:w-5" />}
           Resultado
         </div>
-        <p className={`text-4xl font-extrabold tabular-nums tracking-tight ${positivo ? 'text-[hsl(var(--success))]' : 'text-red-500'}`}>
+        <p className={`text-2xl md:text-4xl font-extrabold tabular-nums tracking-tight ${positivo ? 'text-[hsl(var(--success))]' : 'text-red-500'}`}>
           {fmt(resultado)}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{pct(resultado)}% margen sobre ventas</p>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up animate-delay-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in-up animate-delay-4">
         <div className="panel-card">
           <h3 className="text-sm font-semibold mb-4">Estructura de Costes</h3>
-          <div className="h-56">
+          <div className="h-48 md:h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={costStructure} layout="vertical" margin={{ left: 80 }}>
-                <XAxis type="number" tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <YAxis type="category" dataKey="name" fontSize={11} width={70} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', fontSize: '12px' }} />
+              <BarChart data={costStructure} layout="vertical" margin={{ left: 60, right: 8 }}>
+                <XAxis type="number" tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} fontSize={10} stroke="hsl(var(--muted-foreground))" />
+                <YAxis type="category" dataKey="name" fontSize={10} width={55} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', fontSize: '11px' }} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
               </BarChart>
             </ResponsiveContainer>
@@ -126,7 +126,7 @@ export default function DashboardPage() {
         </div>
         <div className="panel-card">
           <h3 className="text-sm font-semibold mb-4">Resumen</h3>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-2.5 text-xs md:text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Ventas</span><span className="font-semibold tabular-nums">{fmt(ventas)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">− Compras</span><span className="font-semibold tabular-nums">{fmt(comprasTotal)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">− Personal</span><span className="font-semibold tabular-nums">{fmt(personalTotal)}</span></div>
