@@ -110,6 +110,18 @@ MUY IMPORTANTE: Devuelve los importes TAL COMO aparecen en el ticket (CON IVA). 
 
     const extracted = JSON.parse(toolCall.function.arguments);
 
+    // Remove IVA in code (divide by 1.10) — never trust AI to do math
+    const IVA_DIVISOR = 1.10;
+    if (extracted.familias) {
+      extracted.familias = extracted.familias.map((f: any) => ({
+        ...f,
+        importe: Math.round((f.importe / IVA_DIVISOR) * 100) / 100,
+      }));
+    }
+    extracted.total_sin_iva = Math.round(
+      (extracted.familias || []).reduce((s: number, f: any) => s + f.importe, 0) * 100
+    ) / 100;
+
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
