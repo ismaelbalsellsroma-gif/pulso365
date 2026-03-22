@@ -86,7 +86,7 @@ export default function AlbaranesPage() {
     }
   }, [albaranes, searchParams]);
 
-
+  const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await supabase.from('lineas_albaran').delete().eq('albaran_id', id);
       const { error } = await supabase.from('albaranes').delete().eq('id', id);
