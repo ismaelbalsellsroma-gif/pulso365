@@ -82,16 +82,18 @@ export default function CartaPage() {
   // ── Mutations ──
   const saveMut = useMutation({
     mutationFn: async () => {
-      const pvp = Number(form.pvp) || 0;
+      const pvpConIva = Number(form.pvp) || 0;
+      const ivaPct = Number(form.iva_porcentaje) || 10;
+      // El usuario siempre introduce PVP con IVA → convertir a sin IVA para almacenar
+      const pvpSinIva = Math.round((pvpConIva / (1 + ivaPct / 100)) * 100) / 100;
       const payload: any = {
         id: editId || undefined,
         nombre: form.nombre,
         familia_id: form.familia_id || undefined,
-        pvp,
+        pvp: pvpSinIva,
         descripcion: form.descripcion,
-        iva_porcentaje: form.iva_porcentaje,
+        iva_porcentaje: ivaPct,
       };
-      // We'll recalculate coste from ingredients on display
       await upsertPlato(payload);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['platos'] }); setDialogOpen(false); toast.success(editId ? 'Plato actualizado' : 'Plato creado'); },
