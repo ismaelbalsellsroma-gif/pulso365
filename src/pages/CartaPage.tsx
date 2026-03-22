@@ -82,16 +82,18 @@ export default function CartaPage() {
   // ── Mutations ──
   const saveMut = useMutation({
     mutationFn: async () => {
-      const pvp = Number(form.pvp) || 0;
+      const pvpConIva = Number(form.pvp) || 0;
+      const ivaPct = Number(form.iva_porcentaje) || 10;
+      // El usuario siempre introduce PVP con IVA → convertir a sin IVA para almacenar
+      const pvpSinIva = Math.round((pvpConIva / (1 + ivaPct / 100)) * 100) / 100;
       const payload: any = {
         id: editId || undefined,
         nombre: form.nombre,
         familia_id: form.familia_id || undefined,
-        pvp,
+        pvp: pvpSinIva,
         descripcion: form.descripcion,
-        iva_porcentaje: form.iva_porcentaje,
+        iva_porcentaje: ivaPct,
       };
-      // We'll recalculate coste from ingredients on display
       await upsertPlato(payload);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['platos'] }); setDialogOpen(false); toast.success(editId ? 'Plato actualizado' : 'Plato creado'); },
@@ -181,7 +183,10 @@ export default function CartaPage() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, familia_id: p.familia_id || '', pvp: Number(p.pvp) || 0, descripcion: p.descripcion || '', iva_porcentaje: p.iva_porcentaje ?? 10 });
+    const ivaPct = p.iva_porcentaje ?? 10;
+    // Convertir PVP sin IVA almacenado → PVP con IVA para mostrar en el formulario
+    const pvpConIva = Math.round(Number(p.pvp || 0) * (1 + ivaPct / 100) * 100) / 100;
+    setForm({ nombre: p.nombre, familia_id: p.familia_id || '', pvp: pvpConIva, descripcion: p.descripcion || '', iva_porcentaje: ivaPct });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
@@ -284,8 +289,11 @@ export default function CartaPage() {
     if (toImport.length === 0) return;
     setImporting(true);
     try {
+      const defaultIva = 10;
       for (const p of toImport) {
-        await upsertPlato({ nombre: p.nombre, pvp: p.pvp, coste: 0, margen_pct: 100, familia_id: familiaByName[p.familia.toLowerCase()] || undefined });
+        // Los precios escaneados vienen con IVA incluido → convertir a sin IVA
+        const pvpSinIva = Math.round((p.pvp / (1 + defaultIva / 100)) * 100) / 100;
+        await upsertPlato({ nombre: p.nombre, pvp: pvpSinIva, coste: 0, margen_pct: 100, iva_porcentaje: defaultIva, familia_id: familiaByName[p.familia.toLowerCase()] || undefined });
       }
       qc.invalidateQueries({ queryKey: ['platos'] });
       setScanDialogOpen(false);
@@ -710,7 +718,7 @@ export default function CartaPage() {
             <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos.</p>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">Selecciona los platos que quieres importar. Se encontraron <strong>{scannedPlatos.length}</strong> platos.</p>
+              <p className="text-sm text-muted-foreground">Selecciona los platos que quieres importar. Se encontraron <strong>{scannedPlatos.length}</strong> platos. Los precios (con IVA) se convertirán automáticamente a sin IVA.</p>
               <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
                 {scannedPlatos.map((p, idx) => (
                   <div key={idx} onClick={() => toggleScanned(idx)}
@@ -765,8 +773,13 @@ function PlatoForm({ form, setForm, familias }: { form: any; setForm: any; famil
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-sm font-semibold">PVP sin IVA (€)</Label>
+          <Label className="text-sm font-semibold">PVP con IVA (€)</Label>
           <Input type="number" step="0.01" value={form.pvp} onChange={e => setForm((f: any) => ({ ...f, pvp: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+          {form.pvp > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
+              Sin IVA: {(form.pvp / (1 + (form.iva_porcentaje || 10) / 100)).toFixed(2)} €
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-sm font-semibold">% IVA</Label>
