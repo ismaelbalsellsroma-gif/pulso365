@@ -773,8 +773,13 @@ function PlatoForm({ form, setForm, familias }: { form: any; setForm: any; famil
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-sm font-semibold">PVP sin IVA (€)</Label>
+          <Label className="text-sm font-semibold">PVP con IVA (€)</Label>
           <Input type="number" step="0.01" value={form.pvp} onChange={e => setForm((f: any) => ({ ...f, pvp: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+          {form.pvp > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
+              Sin IVA: {(form.pvp / (1 + (form.iva_porcentaje || 10) / 100)).toFixed(2)} €
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-sm font-semibold">% IVA</Label>
