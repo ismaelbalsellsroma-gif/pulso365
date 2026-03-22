@@ -237,24 +237,24 @@ export default function AlbaranesPage() {
   // ─── REVIEW SPLIT VIEW ───
   if (reviewAlbaran) {
     return (
-      <div className="h-[calc(100vh-4rem)] flex flex-col">
+      <div className="h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setReviewAlbaran(null)} className="p-1.5 rounded-md hover:bg-muted transition-colors active:scale-95">
+        <div className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 border-b bg-card shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <button onClick={() => setReviewAlbaran(null)} className="p-1.5 rounded-md hover:bg-muted transition-colors active:scale-95 shrink-0">
               <X className="h-5 w-5" />
             </button>
-            <div>
-              <h2 className="font-semibold text-sm">Albarán {reviewAlbaran.numero || 'sin número'}</h2>
-              <p className="text-xs text-muted-foreground">{reviewAlbaran.proveedor_nombre} · {reviewAlbaran.fecha}</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-xs md:text-sm truncate">Albarán {reviewAlbaran.numero || 'sin número'}</h2>
+              <p className="text-[10px] md:text-xs text-muted-foreground truncate">{reviewAlbaran.proveedor_nombre} · {reviewAlbaran.fecha}</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleSave(false)} disabled={saving} className="gap-1.5 active:scale-95">
-              <Save className="h-3.5 w-3.5" /> Guardar
+          <div className="flex gap-1.5 md:gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => handleSave(false)} disabled={saving} className="gap-1 md:gap-1.5 active:scale-95 h-8 text-xs px-2 md:px-3">
+              <Save className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Guardar</span>
             </Button>
-            <Button size="sm" onClick={() => handleSave(true)} disabled={saving} className="gap-1.5 active:scale-95">
-              <CheckSquare className="h-3.5 w-3.5" /> Verificar
+            <Button size="sm" onClick={() => handleSave(true)} disabled={saving} className="gap-1 md:gap-1.5 active:scale-95 h-8 text-xs px-2 md:px-3">
+              <CheckSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Verificar</span>
             </Button>
           </div>
         </div>
