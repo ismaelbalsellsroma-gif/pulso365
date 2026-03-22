@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { DeleteDialog } from '@/components/DeleteDialog';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { fetchProveedores, fetchAlbaranes, fmt } from '@/lib/queries';
 import { upsertProveedor, deleteProveedor } from '@/lib/mutations';
-import { Plus, Search, Phone, Mail, Pencil, Trash2, FileText, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Pencil, Trash2, FileText, AlertTriangle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
