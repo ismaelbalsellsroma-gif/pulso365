@@ -190,6 +190,173 @@ export default function ProductosPage() {
 
   const uniqueCatNames = [...new Set(categorias.map(c => c.nombre))];
 
+  // ═══ DETAIL VIEW ═══
+  const detailProduct = detailProductId ? productos.find(p => p.id === detailProductId) : null;
+  if (detailProduct) {
+    const pCatId = (detailProduct as any).categoria_id;
+    const catInfo = pCatId ? catMap[pCatId] : null;
+    const actual = Number(detailProduct.precio_actual);
+    const anterior = Number(detailProduct.precio_anterior);
+    let variacion = '';
+    let varClass = '';
+    if (anterior > 0 && Math.abs(actual - anterior) > 0.001) {
+      const pct = ((actual - anterior) / anterior * 100);
+      variacion = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+      varClass = pct > 0 ? 'text-[hsl(var(--error))]' : 'text-[hsl(var(--success))]';
+    }
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setDetailProductId(null)} className="p-2 rounded-lg hover:bg-muted transition-colors active:scale-95">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold truncate">{detailProduct.nombre}</h1>
+            <p className="text-sm text-muted-foreground">{catInfo ? `${catInfo.icon} ${catInfo.nombre}` : 'Sin categoría'} · {detailProduct.proveedor_nombre || 'Sin proveedor'}</p>
+          </div>
+          <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5 active:scale-95" onClick={() => openEdit(detailProduct)}>
+              <Pencil className="h-3.5 w-3.5" /> Editar
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 active:scale-95 text-destructive hover:text-destructive" onClick={() => openDelete(detailProduct.id)}>
+              <Trash2 className="h-3.5 w-3.5" /> Eliminar
+            </Button>
+          </div>
+        </div>
+
+        {/* Info cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in-up">
+          <div className="panel-card text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Precio actual</p>
+            <p className="text-lg font-bold tabular-nums">{fmt(actual)}</p>
+          </div>
+          <div className="panel-card text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Unidad</p>
+            <p className="text-lg font-bold">{detailProduct.unidad || 'ud'}</p>
+          </div>
+          <div className="panel-card text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Variación</p>
+            <p className={`text-lg font-bold tabular-nums ${varClass}`}>{variacion || '—'}</p>
+          </div>
+          <div className="panel-card text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Nº compras</p>
+            <p className="text-lg font-bold tabular-nums">{detailProduct.num_compras || 0}</p>
+          </div>
+        </div>
+
+        {(detailProduct as any).contenido_neto && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+            <Package className="h-3.5 w-3.5" />
+            <span>Contenido neto: <strong className="text-foreground">{(detailProduct as any).contenido_neto} {(detailProduct as any).contenido_unidad}</strong></span>
+            <span>·</span>
+            <span>Precio real: <strong className="text-foreground">{fmt(actual / Number((detailProduct as any).contenido_neto))}/{(detailProduct as any).contenido_unidad}</strong></span>
+          </div>
+        )}
+
+        {/* Historial de albaranes */}
+        <div>
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Historial de albaranes ({productoAlbaranes.length})
+          </h2>
+          {productoAlbaranes.length === 0 ? (
+            <div className="bg-card border rounded-lg p-8 text-center text-sm text-muted-foreground">
+              No se encontraron albaranes para este producto.
+            </div>
+          ) : (
+            <div className="bg-card border rounded-lg overflow-hidden animate-fade-in-up">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[hsl(var(--surface-offset))]">
+                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">Fecha</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">Nº</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">Proveedor</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Importe alb.</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">Estado</th>
+                      <th className="px-4 py-2.5 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productoAlbaranes.map(a => (
+                      <tr
+                        key={a.id}
+                        className="border-t border-[hsl(var(--divider))] hover:bg-primary/5 transition-colors cursor-pointer group"
+                        onClick={() => nav(`/albaranes?id=${a.id}`)}
+                      >
+                        <td className="px-4 py-2.5 tabular-nums">{format(parseISO(a.fecha), 'dd/MM/yyyy')}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground">{a.numero || '—'}</td>
+                        <td className="px-4 py-2.5">{a.proveedor_nombre || '—'}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmt(Number(a.importe))}</td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted">{a.estado}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Keep dialogs accessible from detail view */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="text-sm font-semibold">Nombre *</Label>
+                <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} className="mt-1.5 bg-background" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-semibold">Referencia</Label>
+                  <Input value={form.referencia} onChange={e => setForm(f => ({ ...f, referencia: e.target.value }))} className="mt-1.5 bg-background" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Unidad</Label>
+                  <Input value={form.unidad} onChange={e => setForm(f => ({ ...f, unidad: e.target.value }))} className="mt-1.5 bg-background" placeholder="ud, kg, l..." />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Categoría</Label>
+                <Select value={form.categoria_id || 'none'} onValueChange={v => setForm(f => ({ ...f, categoria_id: v === 'none' ? '' : v }))}>
+                  <SelectTrigger className="mt-1.5 bg-background"><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin categoría</SelectItem>
+                    {categorias.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-semibold">Precio actual (€)</Label>
+                  <Input type="number" step="0.01" value={form.precio_actual} onChange={e => setForm(f => ({ ...f, precio_actual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Proveedor</Label>
+                  <Input value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))} className="mt-1.5 bg-background" />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={() => saveMut.mutate()} disabled={!form.nombre.trim() || saveMut.isPending} className="active:scale-95">
+                {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <DeleteDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={() => { delMut.mutate(); setDetailProductId(null); }} isPending={delMut.isPending} title="¿Eliminar producto?" description="Se eliminará el producto y su historial de precios." />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader title="Productos" description="Catálogo de productos creados automáticamente desde albaranes">
