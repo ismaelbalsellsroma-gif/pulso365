@@ -74,7 +74,19 @@ export default function AlbaranesPage() {
     queryFn: fetchAlbaranes,
   });
 
-  const deleteMutation = useMutation({
+  // Auto-open albarán from URL param ?id=xxx
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id && albaranes.length > 0 && !reviewAlbaran) {
+      const found = albaranes.find(a => a.id === id);
+      if (found) {
+        handleReview(found);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [albaranes, searchParams]);
+
+
     mutationFn: async (id: string) => {
       await supabase.from('lineas_albaran').delete().eq('albaran_id', id);
       const { error } = await supabase.from('albaranes').delete().eq('id', id);
