@@ -56,6 +56,7 @@ interface AlbaranExtra {
 }
 
 export default function AlbaranesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
