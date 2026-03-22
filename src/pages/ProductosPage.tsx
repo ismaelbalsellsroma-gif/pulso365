@@ -44,6 +44,50 @@ export default function ProductosPage() {
   const qc = useQueryClient();
   const { data: productos = [], isLoading } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
+  const { data: albaranes = [] } = useQuery({ queryKey: ['albaranes'], queryFn: fetchAlbaranes });
+
+  // Fetch lineas_albaran for the detail product
+  const { data: lineasAlbaran = [] } = useQuery({
+    queryKey: ['lineas_albaran_producto', detailProductId],
+    queryFn: async () => {
+      if (!detailProductId) return [];
+      // Find product name for matching
+      const prod = productos.find(p => p.id === detailProductId);
+      if (!prod) return [];
+      const { data, error } = await supabase
+        .from('lineas_albaran')
+        .select('*')
+        .ilike('descripcion', `%${prod.nombre_normalizado}%`)
+        .order('albaran_id');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!detailProductId,
+  });
+
+  // Map lineas to their albaranes
+  const albaranMap = useMemo(() => {
+    const map: Record<string, typeof albaranes[0]> = {};
+    for (const a of albaranes) map[a.id] = a;
+    return map;
+  }, [albaranes]);
+
+  const productoAlbaranes = useMemo(() => {
+    if (!detailProductId) return [];
+    const prod = productos.find(p => p.id === detailProductId);
+    if (!prod) return [];
+    
+    // Match by proveedor_nombre + product name in lineas, or by precios_historico
+    const albIds = new Set<string>();
+    for (const l of lineasAlbaran) {
+      albIds.add(l.albaran_id);
+    }
+    
+    return Array.from(albIds)
+      .map(id => albaranMap[id])
+      .filter(Boolean)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [detailProductId, lineasAlbaran, albaranMap, productos]);
 
   // Build categoria id -> name map
   const catMap: Record<string, { nombre: string; icon: string }> = {};
