@@ -101,7 +101,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter className="border-t border-sidebar-border p-2 md:p-3">
         <div className="flex items-center gap-2">
           <button
             onClick={toggleTheme}
@@ -111,7 +111,7 @@ export function AppSidebar() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
           {!collapsed && (
-            <div className="flex flex-col flex-1">
+            <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-medium truncate">{session?.user?.email}</span>
               <span className="text-[10px] text-muted-foreground">Conectado</span>
             </div>

@@ -40,8 +40,8 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-sm space-y-5 md:space-y-6">
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2 mb-4">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">

@@ -58,9 +58,9 @@ export function PeriodSelector({ onChange }: Props = {}) {
   ];
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <Calendar className="h-4 w-4 text-muted-foreground hidden sm:block" />
-      <span className="text-sm font-medium text-muted-foreground hidden md:block">
+    <div className="flex items-center gap-1.5 md:gap-2 flex-wrap flex-1 min-w-0">
+      <Calendar className="h-4 w-4 text-muted-foreground hidden sm:block shrink-0" />
+      <span className="text-xs md:text-sm font-medium text-muted-foreground hidden lg:block truncate">
         {formatLabel(desde, hasta)}
       </span>
       <div className="flex gap-1">
@@ -68,7 +68,7 @@ export function PeriodSelector({ onChange }: Props = {}) {
           <button
             key={c.value}
             onClick={() => setPeriod(c.value)}
-            className={`px-2.5 py-1 text-xs rounded-full transition-colors active:scale-95 ${
+            className={`px-2 md:px-2.5 py-1 text-[11px] md:text-xs rounded-full transition-colors active:scale-95 ${
               active === c.value
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:bg-accent'
@@ -80,7 +80,7 @@ export function PeriodSelector({ onChange }: Props = {}) {
       </div>
       <Popover>
         <PopoverTrigger asChild>
-          <button className="px-2.5 py-1 text-xs rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors active:scale-95 flex items-center gap-1">
+          <button className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors active:scale-95 flex items-center gap-1">
             Rango <ChevronDown className="h-3 w-3" />
           </button>
         </PopoverTrigger>
