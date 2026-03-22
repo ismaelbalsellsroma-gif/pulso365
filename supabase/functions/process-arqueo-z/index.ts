@@ -30,10 +30,7 @@ REGLAS OBLIGATORIAS:
 
 Presta atención a los decimales: el formato español usa comas como separador decimal.
 
-MUY IMPORTANTE: Todos los importes deben ser SIN IVA (base imponible).
-- SIEMPRE divide los importes entre 1.10 para obtener la base imponible.
-- El IVA es SIEMPRE del 10% para TODOS los conceptos sin excepción.
-- El total_sin_iva debe ser la suma de todos los importes ya divididos entre 1.10.`;
+MUY IMPORTANTE: Devuelve los importes TAL COMO aparecen en el ticket (CON IVA). NO dividas ni modifiques los importes. El sistema quitará el IVA automáticamente.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
