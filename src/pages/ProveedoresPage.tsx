@@ -201,14 +201,21 @@ export default function ProveedoresPage() {
                   </button>
 
                   {isExpanded && provAlbaranes.length > 0 && (
-                    <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                    <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
                       {provAlbaranes.map((a, i) => (
-                        <div key={i} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-[hsl(var(--surface-offset))]">
-                          <span className="text-muted-foreground">
+                        <button
+                          key={i}
+                          onClick={() => nav(`/albaranes?id=${a.id}`)}
+                          className="w-full flex items-center justify-between text-[11px] px-2 py-1.5 rounded bg-[hsl(var(--surface-offset))] hover:bg-primary/10 hover:text-primary transition-colors group/alb cursor-pointer"
+                        >
+                          <span className="text-muted-foreground group-hover/alb:text-primary transition-colors">
                             {format(parseISO(a.fecha), 'dd/MM/yyyy')} {a.numero ? `#${a.numero}` : ''}
                           </span>
-                          <span className="font-medium tabular-nums">{fmt(a.importe)}</span>
-                        </div>
+                          <span className="flex items-center gap-1.5">
+                            <span className="font-medium tabular-nums">{fmt(a.importe)}</span>
+                            <ExternalLink className="h-3 w-3 opacity-0 group-hover/alb:opacity-100 transition-opacity" />
+                          </span>
+                        </button>
                       ))}
                     </div>
                   )}
