@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
-import { fetchCategorias, fetchProductos, fmt } from '@/lib/queries';
+import { fetchCategorias, fetchProductos, fetchAlbaranes, fmt } from '@/lib/queries';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ICONS = ['📦', '🥩', '🐟', '🥬', '🧀', '🍞', '🍷', '🍺', '🥤', '🧴', '🍳', '🥚', '🧈', '🫒', '🍫', '🌶️'];
@@ -29,16 +29,84 @@ export default function CategoriasPage() {
   const [form, setForm] = useState(emptyForm);
   const [subcategorias, setSubcategorias] = useState<{ id?: string; nombre: string }[]>([]);
   const [newSub, setNewSub] = useState('');
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
   const qc = useQueryClient();
   const { data: categorias = [], isLoading } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
   const { data: productos = [] } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
+  const { data: albaranes = [] } = useQuery({ queryKey: ['albaranes'], queryFn: fetchAlbaranes });
 
-  // Count products per category
-  const productosPerCat = (catId: string) => {
-    const prods = productos.filter(p => p.categoria_id === catId);
-    return { count: prods.length, total: prods.reduce((s, p) => s + (Number(p.precio_actual) || 0), 0) };
-  };
+  // Fetch all lineas_albaran to calculate spending per product
+  const { data: lineasAlbaran = [] } = useQuery({
+    queryKey: ['lineas_albaran_all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lineas_albaran')
+        .select('albaran_id, descripcion, importe, subcategoria_id');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Total de todas las compras (albaranes)
+  const totalCompras = useMemo(() =>
+    albaranes.reduce((s, a) => s + (Number(a.importe) || 0), 0),
+    [albaranes]
+  );
+
+  // Map products by category with spending data
+  const catStats = useMemo(() => {
+    // Sum spending per product from lineas_albaran matched by nombre_normalizado
+    const productoGastado: Record<string, number> = {};
+    const prodByNombre: Record<string, string> = {};
+    for (const p of productos) {
+      prodByNombre[p.nombre_normalizado] = p.id;
+      productoGastado[p.id] = 0;
+    }
+
+    for (const l of lineasAlbaran) {
+      const desc = (l.descripcion || '').toLowerCase().trim();
+      // Try exact match first
+      if (prodByNombre[desc]) {
+        productoGastado[prodByNombre[desc]] += Number(l.importe) || 0;
+      }
+    }
+
+    // Also use precios_historico approach: count albaranes * precio for products
+    // But lineas_albaran importe is more direct
+
+    // Group by category
+    const result: Record<string, { 
+      count: number; 
+      totalGastado: number; 
+      products: { id: string; nombre: string; precio_actual: number; gastado: number; num_compras: number }[] 
+    }> = {};
+
+    for (const cat of categorias) {
+      const prods = productos.filter(p => p.categoria_id === cat.id);
+      const catGastado = prods.reduce((s, p) => s + (productoGastado[p.id] || 0), 0);
+      result[cat.id] = {
+        count: prods.length,
+        totalGastado: catGastado,
+        products: prods.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          precio_actual: Number(p.precio_actual) || 0,
+          gastado: productoGastado[p.id] || 0,
+          num_compras: Number(p.num_compras) || 0,
+        })).sort((a, b) => b.gastado - a.gastado),
+      };
+    }
+
+    return result;
+  }, [categorias, productos, lineasAlbaran]);
+
+  // Also compute totalGastado across all categories for %
+  const totalGastadoCategorizado = useMemo(() =>
+    Object.values(catStats).reduce((s, c) => s + c.totalGastado, 0),
+    [catStats]
+  );
+
   const sinCategoria = productos.filter(p => !p.categoria_id).length;
 
   const saveMut = useMutation({
@@ -47,7 +115,6 @@ export default function CategoriasPage() {
       if (id) {
         const { error } = await supabase.from('categorias').update({ nombre: rest.nombre, icon: rest.icon, tipo: rest.tipo, orden: rest.orden }).eq('id', id);
         if (error) throw error;
-        // Sync subcategorias: delete removed, insert new
         const existing = categorias.find(c => c.id === id)?.subcategorias || [];
         const existingIds = existing.map((s: any) => s.id);
         const keepIds = subcategorias.filter(s => s.id).map(s => s.id!);
@@ -78,7 +145,6 @@ export default function CategoriasPage() {
 
   const delMut = useMutation({
     mutationFn: async () => {
-      // Delete subcategorias first
       await supabase.from('subcategorias').delete().eq('categoria_id', deleteId!);
       const { error } = await supabase.from('categorias').delete().eq('id', deleteId!);
       if (error) throw error;
@@ -117,18 +183,36 @@ export default function CategoriasPage() {
     setSubcategorias(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const pct = (v: number, total: number) => total > 0 ? Math.round(v / total * 1000) / 10 : 0;
+
   return (
     <div className="space-y-5">
       <PageHeader title="Categorías (Compras)" description="Organiza los productos por categoría de compra">
         <Button className="gap-2 active:scale-95" onClick={openNew}><Plus className="h-4 w-4" /> Nueva Categoría</Button>
       </PageHeader>
 
+      {/* KPI summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in-up">
+        <div className="panel-card">
+          <div className="panel-card-header"><Package className="h-4 w-4" /><span>Total compras</span></div>
+          <div className="panel-card-value text-xl">{fmt(totalCompras)}</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><Package className="h-4 w-4" /><span>Categorías</span></div>
+          <div className="panel-card-value text-xl">{categorias.length}</div>
+        </div>
+        <div className="panel-card">
+          <div className="panel-card-header"><Package className="h-4 w-4 text-amber-500" /><span>Sin categoría</span></div>
+          <div className="panel-card-value text-xl text-amber-500">{sinCategoria}</div>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="text-sm text-muted-foreground p-8 text-center">Cargando categorías...</div>
       ) : categorias.length === 0 ? (
         <div className="text-sm text-muted-foreground p-8 text-center">No hay categorías. Crea la primera.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in-up">
+        <div className="space-y-3 animate-fade-in-up animate-delay-1">
           {sinCategoria > 0 && (
             <div className="panel-card border-[hsl(var(--warning))] border-dashed">
               <div className="flex items-center gap-2.5">
@@ -141,46 +225,118 @@ export default function CategoriasPage() {
             </div>
           )}
           {categorias.map(cat => {
-            const stats = productosPerCat(cat.id);
+            const stats = catStats[cat.id] || { count: 0, totalGastado: 0, products: [] };
+            const isExpanded = expandedCat === cat.id;
+            const catPct = pct(stats.totalGastado, totalCompras);
+
             return (
-            <div key={cat.id} className="panel-card group">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-[hsl(var(--surface-offset))] flex items-center justify-center text-lg">
-                    {cat.icon}
+              <div key={cat.id} className="panel-card group">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-[hsl(var(--surface-offset))] flex items-center justify-center text-lg shrink-0">
+                      {cat.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-sm truncate">{cat.nombre}</h3>
+                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${
+                          cat.tipo === 'comida' ? 'bg-[hsl(var(--success-highlight))] text-[hsl(var(--success))]'
+                          : cat.tipo === 'bebida' ? 'bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]'
+                          : 'bg-[hsl(var(--surface-offset))] text-muted-foreground'
+                        }`}>
+                          {cat.tipo === 'comida' ? 'Comida' : cat.tipo === 'bebida' ? 'Bebida' : 'Otro'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                        <span><strong className="text-foreground">{stats.count}</strong> productos</span>
+                        <span>·</span>
+                        <span>Gastado: <strong className="text-foreground tabular-nums">{fmt(stats.totalGastado)}</strong></span>
+                        <span>·</span>
+                        <span className="font-bold text-foreground tabular-nums">{catPct}%</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm">{cat.nombre}</h3>
-                    <span className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                      cat.tipo === 'comida' ? 'bg-[hsl(var(--success-highlight))] text-[hsl(var(--success))]'
-                      : cat.tipo === 'bebida' ? 'bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]'
-                      : 'bg-[hsl(var(--surface-offset))] text-muted-foreground'
-                    }`}>
-                      {cat.tipo === 'comida' ? 'Comida' : cat.tipo === 'bebida' ? 'Bebida' : 'Otro'}
-                    </span>
+                  <div className="flex items-center gap-1">
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(cat); }} className="p-1 rounded-md text-muted-foreground hover:bg-[hsl(var(--surface-offset))] hover:text-foreground transition-colors">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); openDelete(cat.id); }} className="p-1 rounded-md text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setExpandedCat(isExpanded ? null : cat.id)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:bg-[hsl(var(--surface-offset))] transition-colors"
+                    >
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(cat)} className="p-1 rounded-md text-muted-foreground hover:bg-[hsl(var(--surface-offset))] hover:text-foreground transition-colors">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={() => openDelete(cat.id)} className="p-1 rounded-md text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+
+                {/* % bar */}
+                {catPct > 0 && (
+                  <div className="mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-offset))] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500"
+                      style={{ width: `${Math.min(catPct, 100)}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* Subcategorías */}
+                {!isExpanded && (cat.subcategorias || []).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(cat.subcategorias || []).map((sub: any) => (
+                      <span key={sub.id} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-[hsl(var(--divider))] text-muted-foreground">
+                        {sub.nombre}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expanded: product list with spending */}
+                {isExpanded && (
+                  <div className="mt-3 border-t border-[hsl(var(--divider))] pt-3">
+                    {stats.products.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-3">Sin productos en esta categoría</p>
+                    ) : (
+                      <div className="space-y-0">
+                        {/* Header */}
+                        <div className="grid grid-cols-12 gap-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <div className="col-span-5">Producto</div>
+                          <div className="col-span-2 text-right">Precio</div>
+                          <div className="col-span-2 text-right">Gastado</div>
+                          <div className="col-span-1 text-right">%</div>
+                          <div className="col-span-2 text-center">Compras</div>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto space-y-0.5">
+                          {stats.products.map(p => {
+                            const prodPct = pct(p.gastado, stats.totalGastado);
+                            return (
+                              <div key={p.id} className="grid grid-cols-12 gap-2 px-2 py-1.5 rounded-md hover:bg-[hsl(var(--surface-offset))] transition-colors text-xs items-center">
+                                <div className="col-span-5 font-medium truncate">{p.nombre}</div>
+                                <div className="col-span-2 text-right tabular-nums text-muted-foreground">{fmt(p.precio_actual)}</div>
+                                <div className="col-span-2 text-right tabular-nums font-semibold">{fmt(p.gastado)}</div>
+                                <div className="col-span-1 text-right tabular-nums font-bold text-primary">{prodPct}%</div>
+                                <div className="col-span-2 text-center tabular-nums text-muted-foreground">{p.num_compras}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Category total row */}
+                        <div className="grid grid-cols-12 gap-2 px-2 py-2 border-t border-[hsl(var(--divider))] text-xs font-bold mt-1">
+                          <div className="col-span-5">Total categoría</div>
+                          <div className="col-span-2 text-right"></div>
+                          <div className="col-span-2 text-right tabular-nums">{fmt(stats.totalGastado)}</div>
+                          <div className="col-span-1 text-right tabular-nums text-primary">{catPct}%</div>
+                          <div className="col-span-2 text-center"></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                <span className="font-semibold text-foreground">{stats.count}</span> productos
-                {stats.count > 0 && <span>· últ. precio total {fmt(stats.total)}</span>}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {(cat.subcategorias || []).map((sub: any) => (
-                  <span key={sub.id} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-[hsl(var(--divider))] text-muted-foreground">
-                    {sub.nombre}
-                  </span>
-                ))}
-              </div>
-            </div>
             );
           })}
         </div>
