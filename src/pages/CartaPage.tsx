@@ -289,8 +289,11 @@ export default function CartaPage() {
     if (toImport.length === 0) return;
     setImporting(true);
     try {
+      const defaultIva = 10;
       for (const p of toImport) {
-        await upsertPlato({ nombre: p.nombre, pvp: p.pvp, coste: 0, margen_pct: 100, familia_id: familiaByName[p.familia.toLowerCase()] || undefined });
+        // Los precios escaneados vienen con IVA incluido → convertir a sin IVA
+        const pvpSinIva = Math.round((p.pvp / (1 + defaultIva / 100)) * 100) / 100;
+        await upsertPlato({ nombre: p.nombre, pvp: pvpSinIva, coste: 0, margen_pct: 100, iva_porcentaje: defaultIva, familia_id: familiaByName[p.familia.toLowerCase()] || undefined });
       }
       qc.invalidateQueries({ queryKey: ['platos'] });
       setScanDialogOpen(false);
