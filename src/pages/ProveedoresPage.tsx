@@ -58,16 +58,15 @@ export default function ProveedoresPage() {
   const periodoEnd = endOfMonth(periodoStart);
 
   const albaranesPorProveedor = useMemo(() => {
-    const map: Record<string, { fecha: string; numero: string | null; importe: number }[]> = {};
+    const map: Record<string, { id: string; fecha: string; numero: string | null; importe: number }[]> = {};
     for (const a of albaranes) {
       if (!a.proveedor_id) continue;
       const fecha = parseISO(a.fecha);
       if (fecha >= periodoStart && fecha <= periodoEnd) {
         if (!map[a.proveedor_id]) map[a.proveedor_id] = [];
-        map[a.proveedor_id].push({ fecha: a.fecha, numero: a.numero, importe: Number(a.importe) || 0 });
+        map[a.proveedor_id].push({ id: a.id, fecha: a.fecha, numero: a.numero, importe: Number(a.importe) || 0 });
       }
     }
-    // Sort each group by date desc
     for (const key of Object.keys(map)) {
       map[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
     }
