@@ -183,7 +183,10 @@ export default function CartaPage() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, familia_id: p.familia_id || '', pvp: Number(p.pvp) || 0, descripcion: p.descripcion || '', iva_porcentaje: p.iva_porcentaje ?? 10 });
+    const ivaPct = p.iva_porcentaje ?? 10;
+    // Convertir PVP sin IVA almacenado → PVP con IVA para mostrar en el formulario
+    const pvpConIva = Math.round(Number(p.pvp || 0) * (1 + ivaPct / 100) * 100) / 100;
+    setForm({ nombre: p.nombre, familia_id: p.familia_id || '', pvp: pvpConIva, descripcion: p.descripcion || '', iva_porcentaje: ivaPct });
     setDialogOpen(true);
   };
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
