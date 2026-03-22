@@ -19,6 +19,7 @@ const UNIDADES_CONTENIDO = ['kg', 'g', 'L', 'ml', 'ud'];
 const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '', contenido_neto: '' as string, contenido_unidad: 'kg' };
 
 export default function ProductosPage() {
+  const nav = useNavigate();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('todas');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -26,6 +27,7 @@ export default function ProductosPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
 
   // Quick category assignment
   const [catDialogOpen, setCatDialogOpen] = useState(false);
