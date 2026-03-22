@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchProductos, fetchCategorias, fmt } from '@/lib/queries';
+import { fetchProductos, fetchCategorias, fetchAlbaranes, fmt } from '@/lib/queries';
 import { upsertProducto, deleteProducto } from '@/lib/mutations';
-import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, TrendingUp, Pencil, Trash2, FolderPlus, ArrowLeft, ExternalLink, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { format, parseISO } from 'date-fns';
 
 const UNIDADES_CONTENIDO = ['kg', 'g', 'L', 'ml', 'ud'];
 const emptyForm = { nombre: '', referencia: '', unidad: 'ud', precio_actual: 0, proveedor_nombre: '', categoria_id: '', contenido_neto: '' as string, contenido_unidad: 'kg' };
