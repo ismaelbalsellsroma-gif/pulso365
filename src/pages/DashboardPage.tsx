@@ -17,6 +17,19 @@ export default function DashboardPage() {
   const { data: bancos = [] } = useQuery({ queryKey: ['bancos'], queryFn: fetchBancos });
   const { data: suministros = [] } = useQuery({ queryKey: ['suministros'], queryFn: () => fetchSuministros() });
   const { data: arqueos = [] } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
+  const { data: pedidos = [] } = useQuery({ queryKey: ['pedidos-dash'], queryFn: async () => {
+    const { data } = await supabase.from('pedidos_sugeridos').select('*').eq('estado', 'borrador');
+    return data || [];
+  }});
+  const { data: ingenieria = [] } = useQuery({ queryKey: ['ingenieria-dash'], queryFn: async () => {
+    const { data } = await supabase.from('ingenieria_menu').select('*').order('created_at', { ascending: false }).limit(50);
+    return data || [];
+  }});
+  const { data: mermas = [] } = useQuery({ queryKey: ['mermas-dash'], queryFn: async () => {
+    const mesActual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const { data } = await supabase.from('mermas_registradas').select('*').gte('fecha', `${mesActual}-01`);
+    return data || [];
+  }});
 
   // Proporción del día actual del mes (ej: día 15 de 30 = 0.5)
   const now = new Date();
