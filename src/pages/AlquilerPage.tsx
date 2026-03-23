@@ -105,7 +105,7 @@ export default function AlquilerPage() {
             </div>
             <div>
               <Label className="text-sm font-semibold">Importe mensual (€)</Label>
-              <Input type="number" min={0} step={0.01} value={form.importe_mensual} onChange={e => setForm(f => ({ ...f, importe_mensual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+              <Input type="number" min={0} step={0.01} value={form.importe_mensual || ''} onChange={e => setForm(f => ({ ...f, importe_mensual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
             </div>
             <div className="flex items-center gap-3">
               <Switch checked={form.activo} onCheckedChange={v => setForm(f => ({ ...f, activo: v }))} />

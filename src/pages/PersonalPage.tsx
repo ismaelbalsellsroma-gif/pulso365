@@ -125,7 +125,7 @@ export default function PersonalPage() {
               </div>
               <div>
                 <Label className="text-sm font-semibold">Coste mensual (€)</Label>
-                <Input type="number" min={0} step={0.01} value={form.coste_mensual} onChange={e => setForm(f => ({ ...f, coste_mensual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                <Input type="number" min={0} step={0.01} value={form.coste_mensual || ''} onChange={e => setForm(f => ({ ...f, coste_mensual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
               </div>
             </div>
             <div className="flex items-center gap-3">

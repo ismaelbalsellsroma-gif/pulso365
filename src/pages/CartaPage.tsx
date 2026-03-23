@@ -537,7 +537,7 @@ export default function CartaPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label className="text-sm font-semibold">Cantidad</Label>
-                    <Input type="number" step="0.001" value={ingForm.cantidad} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                    <Input type="number" step="0.001" value={ingForm.cantidad || ''} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
                   </div>
                   <div>
                     <Label className="text-sm font-semibold">Unidad</Label>
@@ -550,7 +550,7 @@ export default function CartaPage() {
                   </div>
                   <div>
                     <Label className="text-sm font-semibold">Merma %</Label>
-                    <Input type="number" step="1" value={ingForm.merma_porcentaje} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                    <Input type="number" step="1" value={ingForm.merma_porcentaje || ''} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
                   </div>
                 </div>
                 <div>
@@ -774,7 +774,7 @@ function PlatoForm({ form, setForm, familias }: { form: any; setForm: any; famil
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-sm font-semibold">PVP con IVA (€)</Label>
-          <Input type="number" step="0.01" value={form.pvp} onChange={e => setForm((f: any) => ({ ...f, pvp: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+          <Input type="number" step="0.01" value={form.pvp || ''} onChange={e => setForm((f: any) => ({ ...f, pvp: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
           {form.pvp > 0 && (
             <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
               Sin IVA: {(form.pvp / (1 + (form.iva_porcentaje || 10) / 100)).toFixed(2)} €
