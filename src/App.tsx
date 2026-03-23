@@ -28,6 +28,8 @@ import AusenciasPage from "@/pages/AusenciasPage";
 import PrediccionPage from "@/pages/PrediccionPage";
 import IngenieriaMenuPage from "@/pages/IngenieriaMenuPage";
 import MermasPage from "@/pages/MermasPage";
+import PricingPage from "@/pages/PricingPage";
+import BancaPage from "@/pages/BancaPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -77,6 +79,8 @@ function AppRoutes() {
         <Route path="/prediccion" element={<PrediccionPage />} />
         <Route path="/ingenieria-menu" element={<IngenieriaMenuPage />} />
         <Route path="/mermas" element={<MermasPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/banca" element={<BancaPage />} />
       </Route>
       <Route path="/auth" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFound />} />
