@@ -550,7 +550,7 @@ export default function CartaPage() {
                   </div>
                   <div>
                     <Label className="text-sm font-semibold">Merma %</Label>
-                    <Input type="number" step="1" value={ingForm.merma_porcentaje} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                    <Input type="number" step="1" value={ingForm.merma_porcentaje || ''} onChange={e => setIngForm(f => ({ ...f, merma_porcentaje: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
                   </div>
                 </div>
                 <div>
