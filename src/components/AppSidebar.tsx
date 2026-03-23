@@ -106,6 +106,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
             Configuración
           </SidebarGroupLabel>
@@ -123,6 +124,7 @@ export function AppSidebar() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
         </SidebarGroup>
       </SidebarContent>
 
