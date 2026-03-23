@@ -1,0 +1,2 @@
+TRUNCATE public.lineas_albaran, public.albaran_categorias, public.factura_albaran_match, public.alertas_precio, public.precios_historico, public.stock_conteos, public.stock_desviaciones, public.stock_solicitudes_semanales, public.plato_ingredientes, public.arqueo_familias, public.aprendizaje CASCADE;
+TRUNCATE public.albaranes, public.facturas_email, public.arqueos_z, public.platos, public.productos, public.proveedores, public.categorias, public.subcategorias, public.familias, public.personal, public.bancos, public.alquiler, public.suministros, public.ajustes CASCADE;
