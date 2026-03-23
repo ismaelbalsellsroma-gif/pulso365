@@ -27,9 +27,15 @@ const mainNav = [
   { title: 'Conciliación', url: '/conciliacion', icon: Activity },
 ];
 
+const personalNav = [
+  { title: 'Personal', url: '/personal', icon: UserCircle },
+  { title: 'Cuadrante', url: '/cuadrante', icon: CalendarDays },
+  { title: 'Fichaje', url: '/fichaje', icon: Clock },
+  { title: 'Ausencias', url: '/ausencias', icon: CalendarOff },
+];
+
 const configNav = [
   { title: 'Ajustes', url: '/ajustes', icon: Settings },
-  { title: 'Personal', url: '/personal', icon: UserCircle },
   { title: 'Alquiler', url: '/alquiler', icon: Home },
   { title: 'Bancos', url: '/bancos', icon: CreditCard },
   { title: 'Suministros', url: '/suministros', icon: Zap },

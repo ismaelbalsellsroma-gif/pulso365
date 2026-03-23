@@ -65,6 +65,9 @@ function AppRoutes() {
         <Route path="/conciliacion" element={<ConciliacionPage />} />
         <Route path="/ajustes" element={<AjustesPage />} />
         <Route path="/personal" element={<PersonalPage />} />
+        <Route path="/cuadrante" element={<CuadrantePage />} />
+        <Route path="/fichaje" element={<FichajePage />} />
+        <Route path="/ausencias" element={<AusenciasPage />} />
         <Route path="/alquiler" element={<AlquilerPage />} />
         <Route path="/bancos" element={<BancosPage />} />
         <Route path="/suministros" element={<SuministrosPage />} />
