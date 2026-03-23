@@ -25,6 +25,9 @@ import SuministrosPage from "@/pages/SuministrosPage";
 import CuadrantePage from "@/pages/CuadrantePage";
 import FichajePage from "@/pages/FichajePage";
 import AusenciasPage from "@/pages/AusenciasPage";
+import PrediccionPage from "@/pages/PrediccionPage";
+import IngenieriaMenuPage from "@/pages/IngenieriaMenuPage";
+import MermasPage from "@/pages/MermasPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
