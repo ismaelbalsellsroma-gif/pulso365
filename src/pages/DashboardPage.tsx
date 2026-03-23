@@ -123,6 +123,31 @@ export default function DashboardPage() {
         <p className="text-xs text-muted-foreground mt-1">{pct(resultado)}% margen sobre ventas</p>
       </div>
 
+      {/* Intelligence blocks */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 animate-fade-in-up animate-delay-4">
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/prediccion')}>
+          <div className="panel-card-header"><Eye className="h-4 w-4" /><span>🔮 Previsión semana</span></div>
+          <div className="panel-card-value text-lg md:text-xl">{pedidos.length} pedidos</div>
+          <div className="panel-card-sub">pendientes de enviar</div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/ingenieria-menu')}>
+          <div className="panel-card-header"><Star className="h-4 w-4" /><span>📊 Ing. Menú</span></div>
+          <div className="panel-card-value text-lg md:text-xl">
+            ⭐{ingenieria.filter(i => i.clasificacion === 'estrella').length} 🐴{ingenieria.filter(i => i.clasificacion === 'caballo').length} 🧩{ingenieria.filter(i => i.clasificacion === 'puzzle').length} 🐕{ingenieria.filter(i => i.clasificacion === 'perro').length}
+          </div>
+          <div className="panel-card-sub">
+            {ingenieria.length > 0 ? `Margen medio: ${(ingenieria.reduce((s, i) => s + (100 - Number(i.food_cost_pct || 0)), 0) / ingenieria.length).toFixed(1)}%` : 'Sin análisis'}
+          </div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/mermas')}>
+          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>💸 Mermas del mes</span></div>
+          <div className="panel-card-value text-lg md:text-xl">{fmt(mermas.reduce((s: number, m: any) => s + Number(m.coste_estimado || 0), 0))}</div>
+          <div className="panel-card-sub">
+            {comprasTotal > 0 ? `${(mermas.reduce((s: number, m: any) => s + Number(m.coste_estimado || 0), 0) / comprasTotal * 100).toFixed(1)}% sobre compras` : 'Sin compras'}
+          </div>
+        </div>
+      </div>
+
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in-up animate-delay-4">
         <div className="panel-card">
