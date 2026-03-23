@@ -27,6 +27,12 @@ const mainNav = [
   { title: 'Conciliación', url: '/conciliacion', icon: Activity },
 ];
 
+const inteligenciaNav = [
+  { title: 'Predicción', url: '/prediccion', icon: TrendingUp },
+  { title: 'Ing. Menú', url: '/ingenieria-menu', icon: Star },
+  { title: 'Mermas', url: '/mermas', icon: AlertTriangle },
+];
+
 const personalNav = [
   { title: 'Personal', url: '/personal', icon: UserCircle },
   { title: 'Cuadrante', url: '/cuadrante', icon: CalendarDays },
