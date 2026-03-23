@@ -74,6 +74,9 @@ function AppRoutes() {
         <Route path="/alquiler" element={<AlquilerPage />} />
         <Route path="/bancos" element={<BancosPage />} />
         <Route path="/suministros" element={<SuministrosPage />} />
+        <Route path="/prediccion" element={<PrediccionPage />} />
+        <Route path="/ingenieria-menu" element={<IngenieriaMenuPage />} />
+        <Route path="/mermas" element={<MermasPage />} />
       </Route>
       <Route path="/auth" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFound />} />
