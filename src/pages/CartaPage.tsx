@@ -537,7 +537,7 @@ export default function CartaPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label className="text-sm font-semibold">Cantidad</Label>
-                    <Input type="number" step="0.001" value={ingForm.cantidad} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                    <Input type="number" step="0.001" value={ingForm.cantidad || ''} onChange={e => setIngForm(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
                   </div>
                   <div>
                     <Label className="text-sm font-semibold">Unidad</Label>
