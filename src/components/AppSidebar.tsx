@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Users, FolderOpen, Grid3x3, Tag, BookOpen,
   Package, Calculator, Receipt, Activity, Settings, UserCircle, Home,
-  CreditCard, Zap, Moon, Sun, LogOut,
+  CreditCard, Zap, Moon, Sun, LogOut, Clock, CalendarDays, CalendarOff,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
@@ -27,9 +27,15 @@ const mainNav = [
   { title: 'Conciliación', url: '/conciliacion', icon: Activity },
 ];
 
+const personalNav = [
+  { title: 'Personal', url: '/personal', icon: UserCircle },
+  { title: 'Cuadrante', url: '/cuadrante', icon: CalendarDays },
+  { title: 'Fichaje', url: '/fichaje', icon: Clock },
+  { title: 'Ausencias', url: '/ausencias', icon: CalendarOff },
+];
+
 const configNav = [
   { title: 'Ajustes', url: '/ajustes', icon: Settings },
-  { title: 'Personal', url: '/personal', icon: UserCircle },
   { title: 'Alquiler', url: '/alquiler', icon: Home },
   { title: 'Bancos', url: '/bancos', icon: CreditCard },
   { title: 'Suministros', url: '/suministros', icon: Zap },
@@ -67,6 +73,26 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+            Personal & Turnos
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {personalNav.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">

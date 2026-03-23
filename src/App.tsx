@@ -22,6 +22,9 @@ import PersonalPage from "@/pages/PersonalPage";
 import AlquilerPage from "@/pages/AlquilerPage";
 import BancosPage from "@/pages/BancosPage";
 import SuministrosPage from "@/pages/SuministrosPage";
+import CuadrantePage from "@/pages/CuadrantePage";
+import FichajePage from "@/pages/FichajePage";
+import AusenciasPage from "@/pages/AusenciasPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +65,9 @@ function AppRoutes() {
         <Route path="/conciliacion" element={<ConciliacionPage />} />
         <Route path="/ajustes" element={<AjustesPage />} />
         <Route path="/personal" element={<PersonalPage />} />
+        <Route path="/cuadrante" element={<CuadrantePage />} />
+        <Route path="/fichaje" element={<FichajePage />} />
+        <Route path="/ausencias" element={<AusenciasPage />} />
         <Route path="/alquiler" element={<AlquilerPage />} />
         <Route path="/bancos" element={<BancosPage />} />
         <Route path="/suministros" element={<SuministrosPage />} />

@@ -32,6 +32,18 @@ export async function upsertPersonal(data: {
   dni?: string;
   coste_mensual?: number;
   activo?: boolean;
+  apellidos?: string;
+  email?: string;
+  telefono?: string;
+  puesto?: string;
+  tipo_contrato?: string;
+  horas_contrato?: number;
+  salario_bruto_mensual?: number;
+  coste_empresa_mensual?: number;
+  coste_hora?: number;
+  fecha_alta?: string;
+  fecha_baja?: string;
+  notas?: string;
 }) {
   const { id, ...rest } = data;
   if (id) {
