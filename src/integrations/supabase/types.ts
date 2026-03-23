@@ -438,6 +438,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cuentas_bancarias: {
+        Row: {
+          activa: boolean | null
+          banco: string | null
+          created_at: string | null
+          iban: string | null
+          id: string
+          nombre: string
+          saldo_actual: number | null
+          ultima_actualizacion: string | null
+        }
+        Insert: {
+          activa?: boolean | null
+          banco?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          nombre: string
+          saldo_actual?: number | null
+          ultima_actualizacion?: string | null
+        }
+        Update: {
+          activa?: boolean | null
+          banco?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          nombre?: string
+          saldo_actual?: number | null
+          ultima_actualizacion?: string | null
+        }
+        Relationships: []
+      }
       factura_albaran_match: {
         Row: {
           albaran_id: string
@@ -643,6 +676,51 @@ export type Database = {
           },
         ]
       }
+      historial_pvp_carta: {
+        Row: {
+          created_at: string | null
+          id: string
+          motivo: string | null
+          plato_id: string
+          pvp_anterior: number | null
+          pvp_nuevo: number | null
+          sugerencia_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          plato_id: string
+          pvp_anterior?: number | null
+          pvp_nuevo?: number | null
+          sugerencia_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          plato_id?: string
+          pvp_anterior?: number | null
+          pvp_nuevo?: number | null
+          sugerencia_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_pvp_carta_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: false
+            referencedRelation: "platos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_pvp_carta_sugerencia_id_fkey"
+            columns: ["sugerencia_id"]
+            isOneToOne: false
+            referencedRelation: "sugerencias_precio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingenieria_menu: {
         Row: {
           accion_sugerida: string | null
@@ -814,6 +892,71 @@ export type Database = {
             columns: ["producto_id"]
             isOneToOne: false
             referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimientos_bancarios: {
+        Row: {
+          concepto: string | null
+          confianza_match: number | null
+          created_at: string | null
+          cuenta_id: string
+          entidad_id: string | null
+          entidad_nombre: string | null
+          estado: string | null
+          factura_id: string | null
+          fecha: string
+          fecha_valor: string | null
+          id: string
+          importe: number
+          notas: string | null
+          referencia: string | null
+          saldo: number | null
+          tipo_detectado: string | null
+        }
+        Insert: {
+          concepto?: string | null
+          confianza_match?: number | null
+          created_at?: string | null
+          cuenta_id: string
+          entidad_id?: string | null
+          entidad_nombre?: string | null
+          estado?: string | null
+          factura_id?: string | null
+          fecha: string
+          fecha_valor?: string | null
+          id?: string
+          importe: number
+          notas?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          tipo_detectado?: string | null
+        }
+        Update: {
+          concepto?: string | null
+          confianza_match?: number | null
+          created_at?: string | null
+          cuenta_id?: string
+          entidad_id?: string | null
+          entidad_nombre?: string | null
+          estado?: string | null
+          factura_id?: string | null
+          fecha?: string
+          fecha_valor?: string | null
+          id?: string
+          importe?: number
+          notas?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          tipo_detectado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_bancarios_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
             referencedColumns: ["id"]
           },
         ]
@@ -1331,6 +1474,39 @@ export type Database = {
         }
         Relationships: []
       }
+      reglas_conciliacion: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          entidad_id: string | null
+          entidad_nombre: string | null
+          id: string
+          patron_concepto: string
+          tipo: string
+          veces_usado: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          entidad_id?: string | null
+          entidad_nombre?: string | null
+          id?: string
+          patron_concepto: string
+          tipo: string
+          veces_usado?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          entidad_id?: string | null
+          entidad_nombre?: string | null
+          id?: string
+          patron_concepto?: string
+          tipo?: string
+          veces_usado?: number | null
+        }
+        Relationships: []
+      }
       stock_conteos: {
         Row: {
           anyo: number | null
@@ -1526,6 +1702,102 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sugerencias_precio: {
+        Row: {
+          coste_anterior: number | null
+          coste_nuevo: number | null
+          created_at: string | null
+          descripcion: string | null
+          estado: string | null
+          familia: string | null
+          fecha_aplicada: string | null
+          food_cost_anterior_pct: number | null
+          food_cost_nuevo_pct: number | null
+          id: string
+          margen_anterior: number | null
+          margen_nuevo: number | null
+          notas_usuario: string | null
+          plato_id: string
+          plato_nombre: string | null
+          precio_producto_anterior: number | null
+          precio_producto_nuevo: number | null
+          producto_id: string | null
+          producto_nombre: string | null
+          pvp_actual: number | null
+          pvp_sugerido: number | null
+          pvp_sugerido_con_iva: number | null
+          tipo_sugerencia: string | null
+          variacion_producto_pct: number | null
+        }
+        Insert: {
+          coste_anterior?: number | null
+          coste_nuevo?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          estado?: string | null
+          familia?: string | null
+          fecha_aplicada?: string | null
+          food_cost_anterior_pct?: number | null
+          food_cost_nuevo_pct?: number | null
+          id?: string
+          margen_anterior?: number | null
+          margen_nuevo?: number | null
+          notas_usuario?: string | null
+          plato_id: string
+          plato_nombre?: string | null
+          precio_producto_anterior?: number | null
+          precio_producto_nuevo?: number | null
+          producto_id?: string | null
+          producto_nombre?: string | null
+          pvp_actual?: number | null
+          pvp_sugerido?: number | null
+          pvp_sugerido_con_iva?: number | null
+          tipo_sugerencia?: string | null
+          variacion_producto_pct?: number | null
+        }
+        Update: {
+          coste_anterior?: number | null
+          coste_nuevo?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          estado?: string | null
+          familia?: string | null
+          fecha_aplicada?: string | null
+          food_cost_anterior_pct?: number | null
+          food_cost_nuevo_pct?: number | null
+          id?: string
+          margen_anterior?: number | null
+          margen_nuevo?: number | null
+          notas_usuario?: string | null
+          plato_id?: string
+          plato_nombre?: string | null
+          precio_producto_anterior?: number | null
+          precio_producto_nuevo?: number | null
+          producto_id?: string | null
+          producto_nombre?: string | null
+          pvp_actual?: number | null
+          pvp_sugerido?: number | null
+          pvp_sugerido_con_iva?: number | null
+          tipo_sugerencia?: string | null
+          variacion_producto_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sugerencias_precio_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: false
+            referencedRelation: "platos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugerencias_precio_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
             referencedColumns: ["id"]
           },
         ]
