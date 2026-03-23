@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { fetchCategorias, fetchProductos, fetchAlbaranes, fmt } from '@/lib/queries';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Pencil, Trash2, X, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, ChevronDown, ChevronUp, Package, Zap, ArrowRight, SkipForward, Square } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ICONS = ['📦', '🥩', '🐟', '🥬', '🧀', '🍞', '🍷', '🍺', '🥤', '🧴', '🍳', '🥚', '🧈', '🫒', '🍫', '🌶️'];
@@ -30,13 +30,14 @@ export default function CategoriasPage() {
   const [subcategorias, setSubcategorias] = useState<{ id?: string; nombre: string }[]>([]);
   const [newSub, setNewSub] = useState('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [quickAssignOpen, setQuickAssignOpen] = useState(false);
+  const [quickIndex, setQuickIndex] = useState(0);
 
   const qc = useQueryClient();
   const { data: categorias = [], isLoading } = useQuery({ queryKey: ['categorias'], queryFn: fetchCategorias });
   const { data: productos = [] } = useQuery({ queryKey: ['productos'], queryFn: fetchProductos });
   const { data: albaranes = [] } = useQuery({ queryKey: ['albaranes'], queryFn: fetchAlbaranes });
 
-  // Fetch all lineas_albaran to calculate spending per product
   const { data: lineasAlbaran = [] } = useQuery({
     queryKey: ['lineas_albaran_all'],
     queryFn: async () => {
@@ -48,40 +49,29 @@ export default function CategoriasPage() {
     },
   });
 
-  // Total de todas las compras (albaranes)
   const totalCompras = useMemo(() =>
     albaranes.reduce((s, a) => s + (Number(a.importe) || 0), 0),
     [albaranes]
   );
 
-  // Map products by category with spending data
   const catStats = useMemo(() => {
-    // Sum spending per product from lineas_albaran matched by nombre_normalizado
     const productoGastado: Record<string, number> = {};
     const prodByNombre: Record<string, string> = {};
     for (const p of productos) {
       prodByNombre[p.nombre_normalizado] = p.id;
       productoGastado[p.id] = 0;
     }
-
     for (const l of lineasAlbaran) {
       const desc = (l.descripcion || '').toLowerCase().trim();
-      // Try exact match first
       if (prodByNombre[desc]) {
         productoGastado[prodByNombre[desc]] += Number(l.importe) || 0;
       }
     }
-
-    // Also use precios_historico approach: count albaranes * precio for products
-    // But lineas_albaran importe is more direct
-
-    // Group by category
-    const result: Record<string, { 
-      count: number; 
-      totalGastado: number; 
-      products: { id: string; nombre: string; precio_actual: number; gastado: number; num_compras: number }[] 
+    const result: Record<string, {
+      count: number;
+      totalGastado: number;
+      products: { id: string; nombre: string; precio_actual: number; gastado: number; num_compras: number }[]
     }> = {};
-
     for (const cat of categorias) {
       const prods = productos.filter(p => p.categoria_id === cat.id);
       const catGastado = prods.reduce((s, p) => s + (productoGastado[p.id] || 0), 0);
@@ -97,18 +87,61 @@ export default function CategoriasPage() {
         })).sort((a, b) => b.gastado - a.gastado),
       };
     }
-
     return result;
   }, [categorias, productos, lineasAlbaran]);
 
-  // Also compute totalGastado across all categories for %
   const totalGastadoCategorizado = useMemo(() =>
     Object.values(catStats).reduce((s, c) => s + c.totalGastado, 0),
     [catStats]
   );
 
-  const sinCategoria = productos.filter(p => !p.categoria_id).length;
+  const productosSinCategoria = useMemo(() =>
+    productos.filter(p => !p.categoria_id),
+    [productos]
+  );
+  const sinCategoria = productosSinCategoria.length;
 
+  // Quick assign mutation
+  const assignMut = useMutation({
+    mutationFn: async ({ productoId, categoriaId }: { productoId: string; categoriaId: string }) => {
+      const { error } = await supabase.from('productos').update({ categoria_id: categoriaId }).eq('id', productoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['productos'] });
+    },
+    onError: () => toast.error('Error asignando categoría'),
+  });
+
+  const handleQuickAssign = async (categoriaId: string) => {
+    const prod = productosSinCategoria[quickIndex];
+    if (!prod) return;
+    await assignMut.mutateAsync({ productoId: prod.id, categoriaId });
+    const cat = categorias.find(c => c.id === categoriaId);
+    toast.success(`${prod.nombre} → ${cat?.icon} ${cat?.nombre}`);
+    // If there are more products after this one was removed from the list, stay at same index
+    // The list will re-render with one less item
+    if (quickIndex >= productosSinCategoria.length - 1) {
+      // Was the last one
+      if (productosSinCategoria.length <= 1) {
+        setQuickAssignOpen(false);
+        toast.success('¡Todos los productos categorizados!');
+      } else {
+        setQuickIndex(quickIndex - 1);
+      }
+    }
+  };
+
+  const openQuickAssign = () => {
+    if (sinCategoria === 0) {
+      toast.info('No hay productos sin categoría');
+      return;
+    }
+    setQuickIndex(0);
+    setQuickAssignOpen(true);
+  };
+
+  // --- CRUD mutations (same as before) ---
   const saveMut = useMutation({
     mutationFn: async () => {
       const { id, ...rest } = { id: editId, ...form };
@@ -119,27 +152,17 @@ export default function CategoriasPage() {
         const existingIds = existing.map((s: any) => s.id);
         const keepIds = subcategorias.filter(s => s.id).map(s => s.id!);
         const toDelete = existingIds.filter((eid: string) => !keepIds.includes(eid));
-        if (toDelete.length > 0) {
-          await supabase.from('subcategorias').delete().in('id', toDelete);
-        }
+        if (toDelete.length > 0) await supabase.from('subcategorias').delete().in('id', toDelete);
         const toInsert = subcategorias.filter(s => !s.id && s.nombre.trim());
-        if (toInsert.length > 0) {
-          await supabase.from('subcategorias').insert(toInsert.map(s => ({ categoria_id: id, nombre: s.nombre })));
-        }
+        if (toInsert.length > 0) await supabase.from('subcategorias').insert(toInsert.map(s => ({ categoria_id: id, nombre: s.nombre })));
       } else {
         const { data: inserted, error } = await supabase.from('categorias').insert({ nombre: rest.nombre, icon: rest.icon, tipo: rest.tipo, orden: rest.orden }).select('id').single();
         if (error) throw error;
         const toInsert = subcategorias.filter(s => s.nombre.trim());
-        if (toInsert.length > 0 && inserted) {
-          await supabase.from('subcategorias').insert(toInsert.map(s => ({ categoria_id: inserted.id, nombre: s.nombre })));
-        }
+        if (toInsert.length > 0 && inserted) await supabase.from('subcategorias').insert(toInsert.map(s => ({ categoria_id: inserted.id, nombre: s.nombre })));
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categorias'] });
-      setDialogOpen(false);
-      toast.success(editId ? 'Categoría actualizada' : 'Categoría creada');
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categorias'] }); setDialogOpen(false); toast.success(editId ? 'Categoría actualizada' : 'Categoría creada'); },
     onError: () => toast.error('Error guardando categoría'),
   });
 
@@ -149,41 +172,24 @@ export default function CategoriasPage() {
       const { error } = await supabase.from('categorias').delete().eq('id', deleteId!);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categorias'] });
-      setDeleteOpen(false);
-      toast.success('Categoría eliminada');
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categorias'] }); setDeleteOpen(false); toast.success('Categoría eliminada'); },
     onError: () => toast.error('Error eliminando categoría'),
   });
 
-  const openNew = () => {
-    setEditId(null);
-    setForm(emptyForm);
-    setSubcategorias([]);
-    setDialogOpen(true);
-  };
-
+  const openNew = () => { setEditId(null); setForm(emptyForm); setSubcategorias([]); setDialogOpen(true); };
   const openEdit = (cat: any) => {
     setEditId(cat.id);
     setForm({ nombre: cat.nombre, icon: cat.icon || '📦', tipo: cat.tipo || 'otro', orden: cat.orden || 0 });
     setSubcategorias((cat.subcategorias || []).map((s: any) => ({ id: s.id, nombre: s.nombre })));
     setDialogOpen(true);
   };
-
   const openDelete = (id: string) => { setDeleteId(id); setDeleteOpen(true); };
-
-  const addSub = () => {
-    if (!newSub.trim()) return;
-    setSubcategorias(prev => [...prev, { nombre: newSub.trim() }]);
-    setNewSub('');
-  };
-
-  const removeSub = (idx: number) => {
-    setSubcategorias(prev => prev.filter((_, i) => i !== idx));
-  };
-
+  const addSub = () => { if (!newSub.trim()) return; setSubcategorias(prev => [...prev, { nombre: newSub.trim() }]); setNewSub(''); };
+  const removeSub = (idx: number) => { setSubcategorias(prev => prev.filter((_, i) => i !== idx)); };
   const pct = (v: number, total: number) => total > 0 ? Math.round(v / total * 1000) / 10 : 0;
+
+  // Current product in quick assign (derived from live data)
+  const currentQuickProduct = productosSinCategoria[Math.min(quickIndex, productosSinCategoria.length - 1)];
 
   return (
     <div className="space-y-5">
@@ -201,9 +207,20 @@ export default function CategoriasPage() {
           <div className="panel-card-header"><Package className="h-4 w-4" /><span>Categorías</span></div>
           <div className="panel-card-value text-xl">{categorias.length}</div>
         </div>
-        <div className="panel-card">
-          <div className="panel-card-header"><Package className="h-4 w-4 text-amber-500" /><span>Sin categoría</span></div>
-          <div className="panel-card-value text-xl text-amber-500">{sinCategoria}</div>
+        <div
+          className={`panel-card cursor-pointer active:scale-[0.98] transition-transform ${sinCategoria > 0 ? 'border-[hsl(var(--warning))] hover:shadow-md' : ''}`}
+          onClick={openQuickAssign}
+        >
+          <div className="panel-card-header">
+            <Zap className="h-4 w-4 text-[hsl(var(--warning))]" />
+            <span>Sin categoría</span>
+          </div>
+          <div className={`panel-card-value text-xl ${sinCategoria > 0 ? 'text-[hsl(var(--warning))]' : ''}`}>{sinCategoria}</div>
+          {sinCategoria > 0 && (
+            <p className="text-[10px] text-[hsl(var(--warning))] mt-1 font-semibold flex items-center gap-1">
+              <Zap className="h-3 w-3" /> Pulsa para asignar rápido
+            </p>
+          )}
         </div>
       </div>
 
@@ -213,17 +230,6 @@ export default function CategoriasPage() {
         <div className="text-sm text-muted-foreground p-8 text-center">No hay categorías. Crea la primera.</div>
       ) : (
         <div className="space-y-3 animate-fade-in-up animate-delay-1">
-          {sinCategoria > 0 && (
-            <div className="panel-card border-[hsl(var(--warning))] border-dashed">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-[hsl(var(--warning-highlight))] flex items-center justify-center text-lg">⚠️</div>
-                <div>
-                  <h3 className="font-semibold text-sm">Sin categoría</h3>
-                  <span className="text-xs text-[hsl(var(--warning))] font-semibold">{sinCategoria} productos</span>
-                </div>
-              </div>
-            </div>
-          )}
           {categorias.map(cat => {
             const stats = catStats[cat.id] || { count: 0, totalGastado: 0, products: [] };
             const isExpanded = expandedCat === cat.id;
@@ -274,17 +280,12 @@ export default function CategoriasPage() {
                   </div>
                 </div>
 
-                {/* % bar */}
                 {catPct > 0 && (
                   <div className="mt-2 h-1.5 rounded-full bg-[hsl(var(--surface-offset))] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-500"
-                      style={{ width: `${Math.min(catPct, 100)}%` }}
-                    />
+                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${Math.min(catPct, 100)}%` }} />
                   </div>
                 )}
 
-                {/* Subcategorías */}
                 {!isExpanded && (cat.subcategorias || []).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {(cat.subcategorias || []).map((sub: any) => (
@@ -295,14 +296,12 @@ export default function CategoriasPage() {
                   </div>
                 )}
 
-                {/* Expanded: product list with spending */}
                 {isExpanded && (
                   <div className="mt-3 border-t border-[hsl(var(--divider))] pt-3">
                     {stats.products.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-3">Sin productos en esta categoría</p>
                     ) : (
                       <div className="space-y-0">
-                        {/* Header */}
                         <div className="grid grid-cols-12 gap-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           <div className="col-span-5">Producto</div>
                           <div className="col-span-2 text-right">Precio</div>
@@ -310,7 +309,7 @@ export default function CategoriasPage() {
                           <div className="col-span-1 text-right">%</div>
                           <div className="col-span-2 text-center">Compras</div>
                         </div>
-                        <div className="max-h-64 overflow-y-auto space-y-0.5">
+                        <div className="max-h-72 overflow-y-auto space-y-0.5">
                           {stats.products.map(p => {
                             const prodPct = pct(p.gastado, stats.totalGastado);
                             return (
@@ -324,7 +323,6 @@ export default function CategoriasPage() {
                             );
                           })}
                         </div>
-                        {/* Category total row */}
                         <div className="grid grid-cols-12 gap-2 px-2 py-2 border-t border-[hsl(var(--divider))] text-xs font-bold mt-1">
                           <div className="col-span-5">Total categoría</div>
                           <div className="col-span-2 text-right"></div>
@@ -342,9 +340,113 @@ export default function CategoriasPage() {
         </div>
       )}
 
+      {/* ===== QUICK ASSIGN MODAL ===== */}
+      <Dialog open={quickAssignOpen} onOpenChange={setQuickAssignOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto p-0">
+          {currentQuickProduct && productosSinCategoria.length > 0 ? (
+            <div className="flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <div>
+                  <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Asignación rápida</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Producto {Math.min(quickIndex + 1, productosSinCategoria.length)} de {productosSinCategoria.length} sin categoría
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" className="gap-1.5 active:scale-95" onClick={() => setQuickAssignOpen(false)}>
+                  <Square className="h-3.5 w-3.5" /> Parar
+                </Button>
+              </div>
+
+              {/* Progress bar */}
+              <div className="mx-5 h-1.5 rounded-full bg-[hsl(var(--surface-offset))] overflow-hidden mb-4">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  style={{ width: `${((productos.length - productosSinCategoria.length) / Math.max(productos.length, 1)) * 100}%` }}
+                />
+              </div>
+
+              {/* Product card */}
+              <div className="mx-5 mb-4 p-4 rounded-xl bg-[hsl(var(--surface-offset))] border border-[hsl(var(--divider))]">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-[hsl(var(--warning-highlight))] flex items-center justify-center text-2xl">
+                    📦
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-base truncate">{currentQuickProduct.nombre}</h3>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                      {currentQuickProduct.proveedor_nombre && (
+                        <span>Proveedor: <strong className="text-foreground">{currentQuickProduct.proveedor_nombre}</strong></span>
+                      )}
+                      {Number(currentQuickProduct.precio_actual) > 0 && (
+                        <span>Precio: <strong className="text-foreground tabular-nums">{fmt(Number(currentQuickProduct.precio_actual))}</strong></span>
+                      )}
+                      {Number(currentQuickProduct.num_compras) > 0 && (
+                        <span>{currentQuickProduct.num_compras} compras</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category grid - LARGE buttons */}
+              <div className="px-5 pb-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Selecciona categoría</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {categorias.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleQuickAssign(cat.id)}
+                      disabled={assignMut.isPending}
+                      className="flex items-center gap-3 p-4 rounded-xl border border-[hsl(var(--divider))] bg-card
+                        hover:border-primary hover:bg-[hsl(var(--primary)/0.06)] hover:shadow-md
+                        active:scale-[0.97] transition-all duration-150 text-left group/btn disabled:opacity-50"
+                    >
+                      <span className="text-2xl shrink-0">{cat.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold truncate block group-hover/btn:text-primary transition-colors">{cat.nombre}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {catStats[cat.id]?.count || 0} prod.
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Skip button */}
+                <div className="flex justify-center mt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      if (quickIndex < productosSinCategoria.length - 1) {
+                        setQuickIndex(quickIndex + 1);
+                      } else {
+                        setQuickIndex(0);
+                        toast.info('Has llegado al final, volviendo al principio');
+                      }
+                    }}
+                  >
+                    <SkipForward className="h-3.5 w-3.5" /> Saltar este producto
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-10 text-center">
+              <div className="text-4xl mb-3">🎉</div>
+              <h3 className="text-lg font-bold">¡Todos categorizados!</h3>
+              <p className="text-sm text-muted-foreground mt-1">No quedan productos sin categoría</p>
+              <Button className="mt-4" onClick={() => setQuickAssignOpen(false)}>Cerrar</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Create/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
           </DialogHeader>
@@ -377,11 +479,9 @@ export default function CategoriasPage() {
               </div>
               <div>
                 <Label className="text-sm font-semibold">Orden</Label>
-                <Input type="number" value={form.orden} onChange={e => setForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                <Input type="number" value={form.orden || ''} onChange={e => setForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
               </div>
             </div>
-
-            {/* Subcategorías */}
             <div>
               <Label className="text-sm font-semibold mb-2 block">Subcategorías</Label>
               <div className="space-y-1.5">
@@ -395,13 +495,7 @@ export default function CategoriasPage() {
                 ))}
               </div>
               <div className="flex gap-2 mt-2">
-                <Input
-                  placeholder="Nueva subcategoría..."
-                  value={newSub}
-                  onChange={e => setNewSub(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSub())}
-                  className="bg-background text-sm"
-                />
+                <Input placeholder="Nueva subcategoría..." value={newSub} onChange={e => setNewSub(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSub())} className="bg-background text-sm" />
                 <Button variant="outline" size="sm" onClick={addSub} disabled={!newSub.trim()}>Añadir</Button>
               </div>
             </div>
