@@ -129,7 +129,7 @@ export default function SuministrosPage() {
             </div>
             <div>
               <Label className="text-sm font-semibold">Importe (€)</Label>
-              <Input type="number" min={0} step={0.01} value={form.importe} onChange={e => setForm(f => ({ ...f, importe: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+              <Input type="number" min={0} step={0.01} value={form.importe || ''} onChange={e => setForm(f => ({ ...f, importe: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
             </div>
           </div>
           <DialogFooter>

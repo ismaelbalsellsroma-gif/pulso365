@@ -511,7 +511,7 @@ export default function ProductosPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm font-semibold">Precio actual (€)</Label>
-                <Input type="number" step="0.01" value={form.precio_actual} onChange={e => setForm(f => ({ ...f, precio_actual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
+                <Input type="number" step="0.01" value={form.precio_actual || ''} onChange={e => setForm(f => ({ ...f, precio_actual: parseFloat(e.target.value) || 0 }))} className="mt-1.5 bg-background" />
               </div>
               <div>
                 <Label className="text-sm font-semibold">Proveedor</Label>
