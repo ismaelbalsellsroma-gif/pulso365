@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { fetchAlbaranes, fetchPersonal, fetchAlquiler, fetchBancos, fetchSuministros, fetchArqueos, fmt } from '@/lib/queries';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DollarSign, ShoppingCart, Users, Home, CreditCard, Zap, TrendingUp, TrendingDown,
-  Coffee, UtensilsCrossed, Plus,
+  Coffee, UtensilsCrossed, Plus, Star, AlertTriangle, Eye,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
