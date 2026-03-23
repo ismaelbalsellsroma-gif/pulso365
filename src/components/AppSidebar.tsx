@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Users, FolderOpen, Grid3x3, Tag, BookOpen,
   Package, Calculator, Receipt, Activity, Settings, UserCircle, Home,
-  CreditCard, Zap, Moon, Sun, LogOut,
+  CreditCard, Zap, Moon, Sun, LogOut, Clock, CalendarDays, CalendarOff,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
