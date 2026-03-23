@@ -118,6 +118,53 @@ export type Database = {
           },
         ]
       }
+      alertas_merma: {
+        Row: {
+          coste_perdida: number | null
+          created_at: string | null
+          desviacion_pct: number | null
+          id: string
+          leida: boolean | null
+          mensaje: string | null
+          periodo: string | null
+          producto_id: string
+          producto_nombre: string | null
+          tipo: string
+        }
+        Insert: {
+          coste_perdida?: number | null
+          created_at?: string | null
+          desviacion_pct?: number | null
+          id?: string
+          leida?: boolean | null
+          mensaje?: string | null
+          periodo?: string | null
+          producto_id: string
+          producto_nombre?: string | null
+          tipo: string
+        }
+        Update: {
+          coste_perdida?: number | null
+          created_at?: string | null
+          desviacion_pct?: number | null
+          id?: string
+          leida?: boolean | null
+          mensaje?: string | null
+          periodo?: string | null
+          producto_id?: string
+          producto_nombre?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_merma_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_precio: {
         Row: {
           albaran_id: string | null
@@ -596,6 +643,74 @@ export type Database = {
           },
         ]
       }
+      ingenieria_menu: {
+        Row: {
+          accion_sugerida: string | null
+          clasificacion: string | null
+          created_at: string | null
+          familia: string | null
+          food_cost_pct: number | null
+          food_cost_unitario: number | null
+          id: string
+          ingresos: number | null
+          margen_total: number | null
+          margen_unitario: number | null
+          periodo_fin: string
+          periodo_inicio: string
+          plato_id: string
+          plato_nombre: string | null
+          popularidad: string | null
+          rentabilidad: string | null
+          unidades_vendidas: number | null
+        }
+        Insert: {
+          accion_sugerida?: string | null
+          clasificacion?: string | null
+          created_at?: string | null
+          familia?: string | null
+          food_cost_pct?: number | null
+          food_cost_unitario?: number | null
+          id?: string
+          ingresos?: number | null
+          margen_total?: number | null
+          margen_unitario?: number | null
+          periodo_fin: string
+          periodo_inicio: string
+          plato_id: string
+          plato_nombre?: string | null
+          popularidad?: string | null
+          rentabilidad?: string | null
+          unidades_vendidas?: number | null
+        }
+        Update: {
+          accion_sugerida?: string | null
+          clasificacion?: string | null
+          created_at?: string | null
+          familia?: string | null
+          food_cost_pct?: number | null
+          food_cost_unitario?: number | null
+          id?: string
+          ingresos?: number | null
+          margen_total?: number | null
+          margen_unitario?: number | null
+          periodo_fin?: string
+          periodo_inicio?: string
+          plato_id?: string
+          plato_nombre?: string | null
+          popularidad?: string | null
+          rentabilidad?: string | null
+          unidades_vendidas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingenieria_menu_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: false
+            referencedRelation: "platos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineas_albaran: {
         Row: {
           albaran_id: string
@@ -649,6 +764,160 @@ export type Database = {
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "subcategorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mermas_registradas: {
+        Row: {
+          cantidad: number
+          coste_estimado: number | null
+          created_at: string | null
+          fecha: string
+          id: string
+          motivo: string | null
+          notas: string | null
+          producto_id: string
+          producto_nombre: string | null
+          registrado_por: string | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad: number
+          coste_estimado?: number | null
+          created_at?: string | null
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          notas?: string | null
+          producto_id: string
+          producto_nombre?: string | null
+          registrado_por?: string | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          coste_estimado?: number | null
+          created_at?: string | null
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          notas?: string | null
+          producto_id?: string
+          producto_nombre?: string | null
+          registrado_por?: string | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mermas_registradas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_sugerido_lineas: {
+        Row: {
+          cantidad_ajustada: number | null
+          cantidad_sugerida: number | null
+          consumo_previsto: number | null
+          created_at: string | null
+          id: string
+          motivo: string | null
+          pedido_id: string
+          precio_estimado: number | null
+          producto_id: string | null
+          producto_nombre: string | null
+          stock_actual: number | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad_ajustada?: number | null
+          cantidad_sugerida?: number | null
+          consumo_previsto?: number | null
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          pedido_id: string
+          precio_estimado?: number | null
+          producto_id?: string | null
+          producto_nombre?: string | null
+          stock_actual?: number | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad_ajustada?: number | null
+          cantidad_sugerida?: number | null
+          consumo_previsto?: number | null
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          pedido_id?: string
+          precio_estimado?: number | null
+          producto_id?: string | null
+          producto_nombre?: string | null
+          stock_actual?: number | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_sugerido_lineas_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_sugeridos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_sugerido_lineas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_sugeridos: {
+        Row: {
+          created_at: string | null
+          estado: string | null
+          fecha_entrega: string
+          fecha_generado: string
+          id: string
+          notas: string | null
+          proveedor_id: string | null
+          proveedor_nombre: string | null
+          total_estimado: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_entrega: string
+          fecha_generado?: string
+          id?: string
+          notas?: string | null
+          proveedor_id?: string | null
+          proveedor_nombre?: string | null
+          total_estimado?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_entrega?: string
+          fecha_generado?: string
+          id?: string
+          notas?: string | null
+          proveedor_id?: string | null
+          proveedor_nombre?: string | null
+          total_estimado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_sugeridos_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
             referencedColumns: ["id"]
           },
         ]
@@ -911,6 +1180,39 @@ export type Database = {
           },
         ]
       }
+      predicciones_demanda: {
+        Row: {
+          basado_en_semanas: number | null
+          confianza: number | null
+          created_at: string | null
+          factores: Json | null
+          familia: string
+          fecha_prediccion: string
+          id: string
+          unidades_predichas: number | null
+        }
+        Insert: {
+          basado_en_semanas?: number | null
+          confianza?: number | null
+          created_at?: string | null
+          factores?: Json | null
+          familia: string
+          fecha_prediccion: string
+          id?: string
+          unidades_predichas?: number | null
+        }
+        Update: {
+          basado_en_semanas?: number | null
+          confianza?: number | null
+          created_at?: string | null
+          factores?: Json | null
+          familia?: string
+          fecha_prediccion?: string
+          id?: string
+          unidades_predichas?: number | null
+        }
+        Relationships: []
+      }
       productos: {
         Row: {
           categoria_id: string | null
@@ -1124,6 +1426,38 @@ export type Database = {
             foreignKeyName: "stock_desviaciones_producto_id_fkey"
             columns: ["producto_id"]
             isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_minimos: {
+        Row: {
+          cantidad_minima: number | null
+          cantidad_reposicion: number | null
+          dias_entrega: number | null
+          id: string
+          producto_id: string
+        }
+        Insert: {
+          cantidad_minima?: number | null
+          cantidad_reposicion?: number | null
+          dias_entrega?: number | null
+          id?: string
+          producto_id: string
+        }
+        Update: {
+          cantidad_minima?: number | null
+          cantidad_reposicion?: number | null
+          dias_entrega?: number | null
+          id?: string
+          producto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_minimos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: true
             referencedRelation: "productos"
             referencedColumns: ["id"]
           },

@@ -3,6 +3,7 @@ import {
   LayoutDashboard, FileText, Users, FolderOpen, Grid3x3, Tag, BookOpen,
   Package, Calculator, Receipt, Activity, Settings, UserCircle, Home,
   CreditCard, Zap, Moon, Sun, LogOut, Clock, CalendarDays, CalendarOff,
+  TrendingUp, Star, AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
@@ -25,6 +26,12 @@ const mainNav = [
   { title: 'Arqueo Z', url: '/arqueo-z', icon: Calculator },
   { title: 'Facturación', url: '/facturacion', icon: Receipt },
   { title: 'Conciliación', url: '/conciliacion', icon: Activity },
+];
+
+const inteligenciaNav = [
+  { title: 'Predicción', url: '/prediccion', icon: TrendingUp },
+  { title: 'Ing. Menú', url: '/ingenieria-menu', icon: Star },
+  { title: 'Mermas', url: '/mermas', icon: AlertTriangle },
 ];
 
 const personalNav = [
@@ -93,6 +100,26 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {personalNav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+            Inteligencia
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {inteligenciaNav.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">

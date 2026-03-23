@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
 import { fetchAlbaranes, fetchPersonal, fetchAlquiler, fetchBancos, fetchSuministros, fetchArqueos, fmt } from '@/lib/queries';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DollarSign, ShoppingCart, Users, Home, CreditCard, Zap, TrendingUp, TrendingDown,
-  Coffee, UtensilsCrossed, Plus,
+  Coffee, UtensilsCrossed, Plus, Star, AlertTriangle, Eye,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -16,6 +17,19 @@ export default function DashboardPage() {
   const { data: bancos = [] } = useQuery({ queryKey: ['bancos'], queryFn: fetchBancos });
   const { data: suministros = [] } = useQuery({ queryKey: ['suministros'], queryFn: () => fetchSuministros() });
   const { data: arqueos = [] } = useQuery({ queryKey: ['arqueos'], queryFn: fetchArqueos });
+  const { data: pedidos = [] } = useQuery({ queryKey: ['pedidos-dash'], queryFn: async () => {
+    const { data } = await supabase.from('pedidos_sugeridos').select('*').eq('estado', 'borrador');
+    return data || [];
+  }});
+  const { data: ingenieria = [] } = useQuery({ queryKey: ['ingenieria-dash'], queryFn: async () => {
+    const { data } = await supabase.from('ingenieria_menu').select('*').order('created_at', { ascending: false }).limit(50);
+    return data || [];
+  }});
+  const { data: mermas = [] } = useQuery({ queryKey: ['mermas-dash'], queryFn: async () => {
+    const mesActual = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const { data } = await supabase.from('mermas_registradas').select('*').gte('fecha', `${mesActual}-01`);
+    return data || [];
+  }});
 
   // Proporción del día actual del mes (ej: día 15 de 30 = 0.5)
   const now = new Date();
@@ -107,6 +121,31 @@ export default function DashboardPage() {
           {fmt(resultado)}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{pct(resultado)}% margen sobre ventas</p>
+      </div>
+
+      {/* Intelligence blocks */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 animate-fade-in-up animate-delay-4">
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/prediccion')}>
+          <div className="panel-card-header"><Eye className="h-4 w-4" /><span>🔮 Previsión semana</span></div>
+          <div className="panel-card-value text-lg md:text-xl">{pedidos.length} pedidos</div>
+          <div className="panel-card-sub">pendientes de enviar</div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/ingenieria-menu')}>
+          <div className="panel-card-header"><Star className="h-4 w-4" /><span>📊 Ing. Menú</span></div>
+          <div className="panel-card-value text-lg md:text-xl">
+            ⭐{ingenieria.filter(i => i.clasificacion === 'estrella').length} 🐴{ingenieria.filter(i => i.clasificacion === 'caballo').length} 🧩{ingenieria.filter(i => i.clasificacion === 'puzzle').length} 🐕{ingenieria.filter(i => i.clasificacion === 'perro').length}
+          </div>
+          <div className="panel-card-sub">
+            {ingenieria.length > 0 ? `Margen medio: ${(ingenieria.reduce((s, i) => s + (100 - Number(i.food_cost_pct || 0)), 0) / ingenieria.length).toFixed(1)}%` : 'Sin análisis'}
+          </div>
+        </div>
+        <div className="panel-card cursor-pointer active:scale-[0.98]" onClick={() => nav('/mermas')}>
+          <div className="panel-card-header"><AlertTriangle className="h-4 w-4" /><span>💸 Mermas del mes</span></div>
+          <div className="panel-card-value text-lg md:text-xl">{fmt(mermas.reduce((s: number, m: any) => s + Number(m.coste_estimado || 0), 0))}</div>
+          <div className="panel-card-sub">
+            {comprasTotal > 0 ? `${(mermas.reduce((s: number, m: any) => s + Number(m.coste_estimado || 0), 0) / comprasTotal * 100).toFixed(1)}% sobre compras` : 'Sin compras'}
+          </div>
+        </div>
       </div>
 
       {/* Charts */}
