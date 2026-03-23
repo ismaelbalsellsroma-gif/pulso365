@@ -22,6 +22,9 @@ import PersonalPage from "@/pages/PersonalPage";
 import AlquilerPage from "@/pages/AlquilerPage";
 import BancosPage from "@/pages/BancosPage";
 import SuministrosPage from "@/pages/SuministrosPage";
+import CuadrantePage from "@/pages/CuadrantePage";
+import FichajePage from "@/pages/FichajePage";
+import AusenciasPage from "@/pages/AusenciasPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
