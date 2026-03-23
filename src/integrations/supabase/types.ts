@@ -293,6 +293,47 @@ export type Database = {
         }
         Relationships: []
       }
+      ausencias: {
+        Row: {
+          created_at: string | null
+          empleado_id: string
+          estado: string | null
+          fecha_fin: string
+          fecha_inicio: string
+          id: string
+          notas: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          empleado_id: string
+          estado?: string | null
+          fecha_fin: string
+          fecha_inicio: string
+          id?: string
+          notas?: string | null
+          tipo?: string
+        }
+        Update: {
+          created_at?: string | null
+          empleado_id?: string
+          estado?: string | null
+          fecha_fin?: string
+          fecha_inicio?: string
+          id?: string
+          notas?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ausencias_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "personal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bancos: {
         Row: {
           activo: boolean | null
@@ -499,6 +540,62 @@ export type Database = {
         }
         Relationships: []
       }
+      fichajes: {
+        Row: {
+          created_at: string | null
+          empleado_id: string
+          fecha: string
+          hora_entrada: string | null
+          hora_salida: string | null
+          horas_extra: number | null
+          horas_trabajadas: number | null
+          id: string
+          latitud: number | null
+          longitud: number | null
+          notas: string | null
+          origen: string | null
+          tipo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          empleado_id: string
+          fecha?: string
+          hora_entrada?: string | null
+          hora_salida?: string | null
+          horas_extra?: number | null
+          horas_trabajadas?: number | null
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          notas?: string | null
+          origen?: string | null
+          tipo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          empleado_id?: string
+          fecha?: string
+          hora_entrada?: string | null
+          hora_salida?: string | null
+          horas_extra?: number | null
+          horas_trabajadas?: number | null
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          notas?: string | null
+          origen?: string | null
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fichajes_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "personal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineas_albaran: {
         Row: {
           albaran_id: string
@@ -559,30 +656,99 @@ export type Database = {
       personal: {
         Row: {
           activo: boolean | null
+          apellidos: string | null
+          coste_empresa_mensual: number | null
+          coste_hora: number | null
           coste_mensual: number | null
           created_at: string
           dni: string | null
+          email: string | null
+          fecha_alta: string | null
+          fecha_baja: string | null
+          foto_url: string | null
+          horas_contrato: number | null
           id: string
           nombre: string
+          notas: string | null
+          puesto: string | null
+          salario_bruto_mensual: number | null
+          telefono: string | null
+          tipo_contrato: string | null
           updated_at: string
         }
         Insert: {
           activo?: boolean | null
+          apellidos?: string | null
+          coste_empresa_mensual?: number | null
+          coste_hora?: number | null
           coste_mensual?: number | null
           created_at?: string
           dni?: string | null
+          email?: string | null
+          fecha_alta?: string | null
+          fecha_baja?: string | null
+          foto_url?: string | null
+          horas_contrato?: number | null
           id?: string
           nombre: string
+          notas?: string | null
+          puesto?: string | null
+          salario_bruto_mensual?: number | null
+          telefono?: string | null
+          tipo_contrato?: string | null
           updated_at?: string
         }
         Update: {
           activo?: boolean | null
+          apellidos?: string | null
+          coste_empresa_mensual?: number | null
+          coste_hora?: number | null
           coste_mensual?: number | null
           created_at?: string
           dni?: string | null
+          email?: string | null
+          fecha_alta?: string | null
+          fecha_baja?: string | null
+          foto_url?: string | null
+          horas_contrato?: number | null
           id?: string
           nombre?: string
+          notas?: string | null
+          puesto?: string | null
+          salario_bruto_mensual?: number | null
+          telefono?: string | null
+          tipo_contrato?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      plantillas_turno: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          nombre: string
+          pausa_minutos: number | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          nombre: string
+          pausa_minutos?: number | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          nombre?: string
+          pausa_minutos?: number | null
         }
         Relationships: []
       }
@@ -1056,6 +1222,53 @@ export type Database = {
           tipo?: string | null
         }
         Relationships: []
+      }
+      turnos_planificados: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          empleado_id: string
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          notas: string | null
+          pausa_minutos: number | null
+          puesto: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          empleado_id: string
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          notas?: string | null
+          pausa_minutos?: number | null
+          puesto?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          empleado_id?: string
+          fecha?: string
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          notas?: string | null
+          pausa_minutos?: number | null
+          puesto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turnos_planificados_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "personal"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
