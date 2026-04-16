@@ -11,6 +11,8 @@ import FichajePage from "@/modules/clock/FichajePage";
 import KioskPage from "@/modules/clock/KioskPage";
 import CuadrantePage from "@/modules/schedule/CuadrantePage";
 import CuadranteIAPage from "@/modules/schedule/CuadranteIAPage";
+import DayViewPage from "@/modules/schedule/DayViewPage";
+import PlannedVsRealPage from "@/modules/clock/PlannedVsRealPage";
 import AusenciasPage from "@/modules/absences/AusenciasPage";
 import ShiftSwapPage from "@/modules/swaps/ShiftSwapPage";
 import ReportesPage from "@/modules/reports/ReportesPage";
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="fichaje" element={<FichajePage profile={profile} />} />
           <Route path="cuadrante" element={<CuadrantePage profile={profile} />} />
           <Route path="cuadrante-ia" element={<CuadranteIAPage profile={profile} />} />
+          <Route path="cuadrante-dia" element={<DayViewPage profile={profile} />} />
+          <Route path="planificado-vs-real" element={<PlannedVsRealPage profile={profile} />} />
           <Route path="ausencias" element={<AusenciasPage profile={profile} />} />
           <Route path="swaps" element={<ShiftSwapPage profile={profile} />} />
           <Route path="reportes" element={<ReportesPage profile={profile} />} />
