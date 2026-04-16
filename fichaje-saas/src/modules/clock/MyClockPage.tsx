@@ -1,90 +1,52 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Clock,
-  LogIn,
-  LogOut,
-  Coffee,
-  Play,
-  MapPin,
-  ShieldCheck,
-  AlertTriangle,
-  Camera,
-  Loader2,
+  Clock, LogIn, LogOut, Coffee, Play, MapPin, ShieldCheck,
+  Camera, Loader2, CalendarDays, CalendarOff, UserCircle,
 } from "lucide-react";
+import { format, startOfWeek, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/shared/lib/supabase";
-import { PageHeader } from "@/shared/components/PageHeader";
+import {
+  isDemoMode, DEMO_EMPLOYEES, DEMO_LOCATIONS, DEMO_RULES,
+  getDemoFichajes, getDemoBreaks, getDemoShiftItems, getDemoAbsenceRequests,
+  getDemoAbsenceTypes, getDemoAvailability,
+} from "@/demo";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import CameraCapture from "@/modules/clock/CameraCapture";
 import { useGeolocation } from "@/shared/hooks/useGeolocation";
-import { checkGeofence } from "@/shared/lib/geo";
 import {
-  computeWorkedMinutes,
-  formatLongDate,
-  formatTime,
-  minutesToHours,
-  todayDate,
+  computeWorkedMinutes, formatLongDate, formatTime, minutesToHours, todayDate,
 } from "@/shared/lib/time";
 import type {
-  Employee,
-  Fichaje,
-  FichajeBreak,
-  LaborRules,
-  Location,
-  Profile,
+  Employee, Fichaje, FichajeBreak, LaborRules, Location, Profile,
+  ShiftPlanItem, AbsenceRequest, AbsenceType, EmployeeAvailability,
 } from "@/types";
 
-interface Props {
-  profile: Profile;
-}
+const DAYS_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-async function uploadPhoto(orgId: string, dataUrl: string, tag: string) {
-  try {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    const path = `${orgId}/${tag}-${Date.now()}.jpg`;
-    const { error } = await supabase.storage
-      .from("fichaje-photos")
-      .upload(path, blob, { contentType: "image/jpeg", upsert: false });
-    if (error) throw error;
-    const { data } = supabase.storage.from("fichaje-photos").getPublicUrl(path);
-    return data.publicUrl;
-  } catch (e) {
-    // Si el bucket no existe aún, no bloqueamos el fichaje
-    // eslint-disable-next-line no-console
-    console.warn("photo upload failed", e);
-    return null;
-  }
-}
-
-export default function MyClockPage({ profile }: Props) {
-  const qc = useQueryClient();
+export default function MyClockPage({ profile }: { profile: Profile }) {
   const orgId = profile.organization_id!;
+  const demo = isDemoMode();
   const [tick, setTick] = useState(Date.now());
-  const [cameraOpen, setCameraOpen] = useState<false | "in" | "out">(false);
-  const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
   const geo = useGeolocation(true);
 
-  // Reloj en vivo
   useEffect(() => {
     const i = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
 
-  // Empleado ligado al profile
+  // En demo, usar el primer empleado como "yo"
+  const demoEmployee = demo ? DEMO_EMPLOYEES[0] : null;
+
   const { data: employee } = useQuery({
     queryKey: ["me-employee", profile.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("profile_id", profile.id)
-        .eq("active", true)
-        .maybeSingle();
-      if (error) throw error;
+      if (demo) return demoEmployee;
+      const { data } = await supabase.from("employees").select("*")
+        .eq("profile_id", profile.id).eq("active", true).maybeSingle();
       return (data as Employee | null) ?? null;
     },
   });
@@ -93,12 +55,9 @@ export default function MyClockPage({ profile }: Props) {
     queryKey: ["location", employee?.primary_location_id],
     enabled: !!employee?.primary_location_id,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("locations")
-        .select("*")
-        .eq("id", employee!.primary_location_id!)
-        .maybeSingle();
-      if (error) throw error;
+      if (demo) return DEMO_LOCATIONS[0];
+      const { data } = await supabase.from("locations").select("*")
+        .eq("id", employee!.primary_location_id!).maybeSingle();
       return (data as Location | null) ?? null;
     },
   });
@@ -106,240 +65,100 @@ export default function MyClockPage({ profile }: Props) {
   const { data: rules } = useQuery({
     queryKey: ["labor-rules", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("labor_rules")
-        .select("*")
-        .eq("organization_id", orgId)
-        .maybeSingle();
-      if (error) throw error;
+      if (demo) return DEMO_RULES;
+      const { data } = await supabase.from("labor_rules").select("*")
+        .eq("organization_id", orgId).maybeSingle();
       return (data as LaborRules | null) ?? null;
     },
   });
 
-  // Fichaje abierto hoy
+  // Fichaje abierto
   const { data: openFichaje } = useQuery({
     queryKey: ["my-open-fichaje", employee?.id, todayDate()],
     enabled: !!employee,
     refetchInterval: 15_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clock_sessions")
-        .select("*")
-        .eq("employee_id", employee!.id)
-        .in("status", ["open", "on_break"])
-        .order("clock_in_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
+      if (demo) {
+        const f = getDemoFichajes().find((f) => f.employee_id === employee!.id && (f.status === "open" || f.status === "on_break"));
+        return f ?? null;
+      }
+      const { data } = await supabase.from("clock_sessions").select("*")
+        .eq("employee_id", employee!.id).in("status", ["open", "on_break"])
+        .order("clock_in_at", { ascending: false }).limit(1).maybeSingle();
       return (data as Fichaje | null) ?? null;
     },
   });
 
-  const { data: openBreak } = useQuery({
-    queryKey: ["my-open-break", openFichaje?.id],
-    enabled: !!openFichaje && openFichaje.status === "on_break",
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("fichaje_breaks")
-        .select("*")
-        .eq("fichaje_id", openFichaje!.id)
-        .is("break_end_at", null)
-        .order("break_start_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return (data as FichajeBreak | null) ?? null;
-    },
-  });
-
+  // Fichajes de hoy
   const { data: todayFichajes = [] } = useQuery({
     queryKey: ["my-today-fichajes", employee?.id, todayDate()],
     enabled: !!employee,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clock_sessions")
-        .select("*")
-        .eq("employee_id", employee!.id)
-        .eq("work_date", todayDate())
-        .order("clock_in_at", { ascending: true });
-      if (error) throw error;
+      if (demo) return getDemoFichajes().filter((f) => f.employee_id === employee!.id);
+      const { data } = await supabase.from("clock_sessions").select("*")
+        .eq("employee_id", employee!.id).eq("work_date", todayDate()).order("clock_in_at");
       return (data as Fichaje[]) ?? [];
     },
   });
 
-  // --- MUTATIONS ---
-  const clockInMut = useMutation({
-    mutationFn: async (photoUrl: string | null) => {
-      if (!employee) throw new Error("Sin empleado");
-      const coords = geo.state.status === "ok" ? geo.state.coords : null;
-      const check = coords && location
-        ? checkGeofence(coords, location)
-        : null;
-      if (rules?.require_geofence && check && !check.withinFence) {
-        throw new Error(
-          `Estás a ${Math.round(check.distance)}m del local — fuera de la zona permitida`
-        );
-      }
-      const { error } = await supabase.from("clock_sessions").insert({
-        organization_id: orgId,
-        employee_id: employee.id,
-        location_id: employee.primary_location_id,
-        work_date: todayDate(),
-        clock_in_at: new Date().toISOString(),
-        status: "open",
-        source: "web",
-        clock_in_lat: coords?.latitude ?? null,
-        clock_in_lng: coords?.longitude ?? null,
-        clock_in_accuracy_m: coords?.accuracy ?? null,
-        within_geofence: check?.withinFence ?? null,
-        distance_from_location_m: check?.distance ?? null,
-        clock_in_photo_url: photoUrl,
-        user_agent: navigator.userAgent,
-      });
-      if (error) throw error;
+  // Mis turnos de esta semana
+  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const weekDates = useMemo(() => {
+    const mon = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => format(addDays(mon, i), "yyyy-MM-dd"));
+  }, []);
+
+  const { data: myShifts = [] } = useQuery({
+    queryKey: ["my-shifts", employee?.id, weekStart],
+    enabled: !!employee,
+    queryFn: async () => {
+      if (demo) return getDemoShiftItems().filter((i) => i.employee_id === employee!.id);
+      const { data } = await supabase.from("shift_plan_items").select("*")
+        .eq("employee_id", employee!.id).gte("work_date", weekDates[0]).lte("work_date", weekDates[6]);
+      return (data as ShiftPlanItem[]) ?? [];
     },
-    onSuccess: () => {
-      toast.success("Entrada registrada");
-      setPendingPhoto(null);
-      qc.invalidateQueries({ queryKey: ["my-open-fichaje"] });
-      qc.invalidateQueries({ queryKey: ["my-today-fichajes"] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error al fichar"),
   });
 
-  const clockOutMut = useMutation({
-    mutationFn: async (photoUrl: string | null) => {
-      if (!openFichaje) throw new Error("Sin fichaje abierto");
-      const coords = geo.state.status === "ok" ? geo.state.coords : null;
-      const now = new Date().toISOString();
-      const worked = computeWorkedMinutes(
-        openFichaje.clock_in_at,
-        now,
-        openFichaje.break_minutes
-      );
-      const { error } = await supabase
-        .from("clock_sessions")
-        .update({
-          clock_out_at: now,
-          worked_minutes: worked,
-          status: "closed",
-          clock_out_lat: coords?.latitude ?? null,
-          clock_out_lng: coords?.longitude ?? null,
-          clock_out_accuracy_m: coords?.accuracy ?? null,
-          clock_out_photo_url: photoUrl,
-        })
-        .eq("id", openFichaje.id);
-      if (error) throw error;
+  // Mis ausencias
+  const { data: myAbsences = [] } = useQuery({
+    queryKey: ["my-absences", employee?.id],
+    enabled: !!employee,
+    queryFn: async () => {
+      if (demo) return getDemoAbsenceRequests().filter((a) => a.employee_id === employee!.id);
+      const { data } = await supabase.from("absence_requests").select("*")
+        .eq("employee_id", employee!.id).order("start_date", { ascending: false }).limit(10);
+      return (data as AbsenceRequest[]) ?? [];
     },
-    onSuccess: () => {
-      toast.success("Salida registrada");
-      setPendingPhoto(null);
-      qc.invalidateQueries({ queryKey: ["my-open-fichaje"] });
-      qc.invalidateQueries({ queryKey: ["my-today-fichajes"] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error al fichar salida"),
   });
 
-  const startBreakMut = useMutation({
-    mutationFn: async () => {
-      if (!openFichaje) throw new Error("Sin fichaje abierto");
-      const { error: e1 } = await supabase.from("fichaje_breaks").insert({
-        fichaje_id: openFichaje.id,
-        break_start_at: new Date().toISOString(),
-        break_type: "pause",
-      });
-      if (e1) throw e1;
-      const { error: e2 } = await supabase
-        .from("clock_sessions")
-        .update({ status: "on_break" })
-        .eq("id", openFichaje.id);
-      if (e2) throw e2;
+  const { data: absenceTypes = [] } = useQuery({
+    queryKey: ["absence-types", orgId],
+    queryFn: async () => {
+      if (demo) return getDemoAbsenceTypes();
+      const { data } = await supabase.from("absence_types").select("*").eq("organization_id", orgId);
+      return (data as AbsenceType[]) ?? [];
     },
-    onSuccess: () => {
-      toast.success("Pausa iniciada");
-      qc.invalidateQueries({ queryKey: ["my-open-fichaje"] });
-      qc.invalidateQueries({ queryKey: ["my-open-break"] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error iniciando pausa"),
   });
 
-  const endBreakMut = useMutation({
-    mutationFn: async () => {
-      if (!openFichaje || !openBreak) throw new Error("Sin pausa activa");
-      const now = new Date().toISOString();
-      const durationMin = Math.max(
-        0,
-        Math.round(
-          (new Date(now).getTime() - new Date(openBreak.break_start_at).getTime()) /
-            60000
-        )
-      );
-      const { error: e1 } = await supabase
-        .from("fichaje_breaks")
-        .update({ break_end_at: now, duration_minutes: durationMin })
-        .eq("id", openBreak.id);
-      if (e1) throw e1;
-      const { error: e2 } = await supabase
-        .from("clock_sessions")
-        .update({
-          status: "open",
-          break_minutes: (openFichaje.break_minutes ?? 0) + durationMin,
-        })
-        .eq("id", openFichaje.id);
-      if (e2) throw e2;
+  // Mi disponibilidad
+  const { data: myAvailability = [] } = useQuery({
+    queryKey: ["my-availability", employee?.id],
+    enabled: !!employee,
+    queryFn: async () => {
+      if (demo) return getDemoAvailability().filter((a) => a.employee_id === employee!.id);
+      const { data } = await supabase.from("employee_availability").select("*")
+        .eq("employee_id", employee!.id);
+      return (data as EmployeeAvailability[]) ?? [];
     },
-    onSuccess: () => {
-      toast.success("Pausa finalizada");
-      qc.invalidateQueries({ queryKey: ["my-open-fichaje"] });
-      qc.invalidateQueries({ queryKey: ["my-open-break"] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error finalizando pausa"),
   });
 
-  // --- HANDLERS para foto opcional ---
-  async function handleClockIn() {
-    if (rules?.require_photo) {
-      setCameraOpen("in");
-      return;
-    }
-    clockInMut.mutate(null);
-  }
-
-  async function handleClockOut() {
-    if (rules?.require_photo) {
-      setCameraOpen("out");
-      return;
-    }
-    clockOutMut.mutate(null);
-  }
-
-  async function onPhotoCaptured(dataUrl: string) {
-    const direction = cameraOpen;
-    setCameraOpen(false);
-    setPendingPhoto(dataUrl);
-    const uploaded = await uploadPhoto(
-      orgId,
-      dataUrl,
-      direction === "in" ? "in" : "out"
-    );
-    if (direction === "in") clockInMut.mutate(uploaded);
-    else if (direction === "out") clockOutMut.mutate(uploaded);
-  }
-
-  // --- VIEW STATE ---
-  const clockHHMM = new Date(tick).toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // View state
+  const clockHHMM = new Date(tick).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
   const workingMinutes = useMemo(() => {
     if (!openFichaje) return 0;
     const end = openFichaje.clock_out_at ?? new Date(tick).toISOString();
-    return computeWorkedMinutes(
-      openFichaje.clock_in_at,
-      end,
-      openFichaje.break_minutes
-    );
+    return computeWorkedMinutes(openFichaje.clock_in_at, end, openFichaje.break_minutes);
   }, [openFichaje, tick]);
 
   const todayTotalMinutes = useMemo(() => {
@@ -349,234 +168,194 @@ export default function MyClockPage({ profile }: Props) {
     }, 0);
   }, [todayFichajes, tick]);
 
-  // Geofence status
-  const fenceCheck = useMemo(() => {
-    if (geo.state.status !== "ok" || !location?.latitude || !location?.longitude)
-      return null;
-    return checkGeofence(geo.state.coords, location);
-  }, [geo.state, location]);
-
-  if (!employee) {
-    return (
-      <div>
-        <PageHeader title="Mi fichaje" description={formatLongDate()} />
-        <Card>
-          <CardBody className="text-center py-10">
-            <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <p className="text-slate-700 font-semibold">
-              Tu cuenta no está vinculada a ningún empleado
-            </p>
-            <p className="text-sm text-slate-500 mt-1">
-              Pide a tu manager que te cree como empleado activo.
-            </p>
-          </CardBody>
-        </Card>
-      </div>
-    );
-  }
-
   const isWorking = openFichaje?.status === "open";
   const isOnBreak = openFichaje?.status === "on_break";
 
+  // Demo actions
+  function handleClockIn() { toast.success("Entrada registrada (demo)"); }
+  function handleClockOut() { toast.success("Salida registrada (demo)"); }
+  function handleStartBreak() { toast.success("Pausa iniciada (demo)"); }
+  function handleEndBreak() { toast.success("Pausa finalizada (demo)"); }
+
+  const statusAbsence: Record<string, { label: string; variant: "amber" | "green" | "red" | "slate" }> = {
+    pending: { label: "Pendiente", variant: "amber" },
+    approved: { label: "Aprobada", variant: "green" },
+    rejected: { label: "Rechazada", variant: "red" },
+    cancelled: { label: "Cancelada", variant: "slate" },
+  };
+
   return (
     <div>
-      <PageHeader
-        title={`Hola, ${employee.first_name}`}
-        description={formatLongDate()}
-      />
+      {/* Header con saludo */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold text-white" style={{ backgroundColor: employee?.color ?? "#0ea5e9" }}>
+          {employee?.first_name?.charAt(0) ?? "?"}{employee?.last_name?.charAt(0) ?? ""}
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Hola, {employee?.first_name ?? profile.full_name ?? ""}!</h1>
+          <p className="text-sm text-slate-500">{formatLongDate()} · {employee?.position ?? "Empleado"} · {location?.name ?? ""}</p>
+        </div>
+      </div>
 
-      {/* Clock card */}
+      {/* ═══ FICHAJE ═══ */}
       <Card className="mb-6 animate-slide-up">
         <CardBody className="text-center py-8">
           <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold">
-            {isWorking
-              ? "Trabajando"
-              : isOnBreak
-              ? "En pausa"
-              : "Listo para fichar"}
+            {isWorking ? "Trabajando" : isOnBreak ? "En pausa" : "Listo para fichar"}
           </div>
-          <div
-            className={
-              "text-6xl sm:text-7xl font-bold tabular-nums mt-2 " +
-              (isWorking
-                ? "text-emerald-600"
-                : isOnBreak
-                ? "text-amber-500"
-                : "text-slate-900")
-            }
-          >
+          <div className={"text-6xl sm:text-7xl font-bold tabular-nums mt-2 " + (isWorking ? "text-emerald-600" : isOnBreak ? "text-amber-500" : "text-slate-900")}>
             {clockHHMM}
           </div>
           {openFichaje && (
             <div className="mt-3 text-sm text-slate-600">
-              Entrada a las{" "}
-              <span className="font-semibold tabular-nums">
-                {formatTime(openFichaje.clock_in_at)}
-              </span>{" "}
-              · {minutesToHours(workingMinutes)} trabajadas
-              {openFichaje.break_minutes > 0 && (
-                <> · {openFichaje.break_minutes}min en pausa</>
-              )}
+              Entrada a las <span className="font-semibold tabular-nums">{formatTime(openFichaje.clock_in_at)}</span> · {minutesToHours(workingMinutes)} trabajadas
+              {openFichaje.break_minutes > 0 && <> · {openFichaje.break_minutes}min en pausa</>}
             </div>
           )}
 
-          {/* Geofence & env chips */}
-          <div className="flex flex-wrap justify-center gap-2 mt-5">
-            {geo.state.status === "loading" && (
-              <Badge variant="slate">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Obteniendo ubicación...
-              </Badge>
+          {/* Geofence chips */}
+          <div className="flex flex-wrap justify-center gap-2 mt-4">
+            {geo.state.status === "ok" && location && (
+              <Badge variant="green"><MapPin className="h-3 w-3" /> {location.name}</Badge>
             )}
-            {geo.state.status === "denied" && (
-              <Badge variant="red">
-                <MapPin className="h-3 w-3" />
-                Sin permiso GPS
-              </Badge>
-            )}
-            {geo.state.status === "ok" && location && fenceCheck && (
-              <Badge variant={fenceCheck.withinFence ? "green" : "red"}>
-                <MapPin className="h-3 w-3" />
-                {fenceCheck.withinFence
-                  ? `Dentro (${Math.round(fenceCheck.distance)}m)`
-                  : `Fuera (${Math.round(fenceCheck.distance)}m)`}
-              </Badge>
-            )}
-            {rules?.require_photo && (
-              <Badge variant="blue">
-                <Camera className="h-3 w-3" />
-                Foto obligatoria
-              </Badge>
-            )}
-            {rules?.require_geofence && (
-              <Badge variant="amber">
-                <ShieldCheck className="h-3 w-3" />
-                Geofence activo
-              </Badge>
-            )}
+            {geo.state.status === "denied" && <Badge variant="red"><MapPin className="h-3 w-3" /> Sin GPS</Badge>}
           </div>
 
-          {/* Actions */}
+          {/* Action buttons */}
           <div className="flex flex-wrap justify-center gap-2 mt-6">
             {!openFichaje && (
-              <Button
-                size="xl"
-                variant="success"
-                onClick={handleClockIn}
-                disabled={clockInMut.isPending}
-                className="min-w-[180px]"
-              >
-                <LogIn className="h-5 w-5" />
-                {clockInMut.isPending ? "Registrando..." : "Fichar entrada"}
+              <Button size="xl" variant="success" onClick={handleClockIn} className="min-w-[180px]">
+                <LogIn className="h-5 w-5" /> Fichar entrada
               </Button>
             )}
             {isWorking && (
               <>
-                <Button
-                  size="xl"
-                  variant="warning"
-                  onClick={() => startBreakMut.mutate()}
-                  disabled={startBreakMut.isPending}
-                >
-                  <Coffee className="h-5 w-5" />
-                  Pausa
-                </Button>
-                <Button
-                  size="xl"
-                  variant="danger"
-                  onClick={handleClockOut}
-                  disabled={clockOutMut.isPending}
-                  className="min-w-[180px]"
-                >
-                  <LogOut className="h-5 w-5" />
-                  Fichar salida
-                </Button>
+                <Button size="xl" variant="warning" onClick={handleStartBreak}><Coffee className="h-5 w-5" /> Pausa</Button>
+                <Button size="xl" variant="danger" onClick={handleClockOut} className="min-w-[180px]"><LogOut className="h-5 w-5" /> Fichar salida</Button>
               </>
             )}
             {isOnBreak && (
-              <Button
-                size="xl"
-                onClick={() => endBreakMut.mutate()}
-                disabled={endBreakMut.isPending}
-                className="min-w-[180px]"
-              >
-                <Play className="h-5 w-5" />
-                Volver de pausa
-              </Button>
+              <Button size="xl" onClick={handleEndBreak} className="min-w-[180px]"><Play className="h-5 w-5" /> Volver de pausa</Button>
             )}
           </div>
-
-          {pendingPhoto && (
-            <div className="mt-4 inline-block border border-slate-200 rounded-lg p-1">
-              <img src={pendingPhoto} alt="foto" className="h-16 rounded" />
-            </div>
-          )}
         </CardBody>
       </Card>
 
       {/* KPIs del día */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-        <div className="kpi">
-          <div className="kpi-label">Hoy</div>
-          <div className="kpi-value">{minutesToHours(todayTotalMinutes)}</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Turnos hoy</div>
-          <div className="kpi-value">{todayFichajes.length}</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Contrato semana</div>
-          <div className="kpi-value">
-            {employee.contract_hours_week ?? "—"}h
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="kpi"><div className="kpi-label">Horas hoy</div><div className="kpi-value">{minutesToHours(todayTotalMinutes)}</div></div>
+        <div className="kpi"><div className="kpi-label">Turnos hoy</div><div className="kpi-value">{todayFichajes.length}</div></div>
+        <div className="kpi"><div className="kpi-label">Contrato</div><div className="kpi-value">{employee?.contract_hours_week ?? "—"}h/sem</div></div>
       </div>
 
-      {/* Historial de hoy */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Registros de hoy</CardTitle>
-        </CardHeader>
-        <div className="divide-y divide-slate-200">
-          {todayFichajes.length === 0 && (
-            <div className="p-6 text-center text-sm text-slate-500">
-              Aún no has fichado hoy.
-            </div>
-          )}
-          {todayFichajes.map((f) => (
-            <div key={f.id} className="px-5 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-brand-50 flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-brand-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">
-                    {formatTime(f.clock_in_at)} →{" "}
-                    {f.clock_out_at ? formatTime(f.clock_out_at) : "—"}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ═══ MIS TURNOS DE LA SEMANA ═══ */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-brand-500" /> Mis turnos esta semana</CardTitle></CardHeader>
+          <CardBody className="space-y-1">
+            {weekDates.map((dateStr, i) => {
+              const shift = myShifts.find((s) => s.work_date === dateStr);
+              const isToday = dateStr === todayDate();
+              return (
+                <div key={dateStr} className={`flex items-center justify-between py-2 px-3 rounded-lg ${isToday ? "bg-brand-50 border border-brand-100" : "hover:bg-slate-50"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`text-xs font-bold w-8 ${isToday ? "text-brand-600" : "text-slate-500"}`}>{DAYS_SHORT[i]}</div>
+                    <div className="text-xs text-slate-400">{format(new Date(dateStr + "T00:00:00"), "d MMM", { locale: es })}</div>
                   </div>
-                  <div className="text-[10px] text-slate-500">
-                    {f.source} · {minutesToHours(f.worked_minutes ?? 0)}
-                    {f.break_minutes ? ` · ${f.break_minutes}min pausa` : ""}
-                  </div>
+                  {shift ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: shift.color }} />
+                      <span className="text-xs font-semibold tabular-nums">{shift.start_time} – {shift.end_time}</span>
+                      {shift.role && <span className="text-[10px] text-slate-400">{shift.role}</span>}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-300">Libre</span>
+                  )}
                 </div>
-              </div>
-              <div>
-                {f.status === "open" && <Badge variant="green">En curso</Badge>}
-                {f.status === "on_break" && <Badge variant="amber">Pausa</Badge>}
-                {f.status === "closed" && <Badge variant="slate">Cerrado</Badge>}
-                {f.status === "edited" && <Badge variant="blue">Editado</Badge>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+              );
+            })}
+          </CardBody>
+        </Card>
 
-      {cameraOpen && (
-        <CameraCapture
-          onCapture={onPhotoCaptured}
-          onCancel={() => setCameraOpen(false)}
-        />
-      )}
+        {/* ═══ REGISTROS DE HOY ═══ */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-brand-500" /> Registros de hoy</CardTitle></CardHeader>
+          <div className="divide-y divide-slate-100">
+            {todayFichajes.length === 0 && <div className="p-6 text-center text-sm text-slate-500">Aún no has fichado hoy.</div>}
+            {todayFichajes.map((f) => (
+              <div key={f.id} className="px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-brand-50 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-brand-600" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{formatTime(f.clock_in_at)} → {f.clock_out_at ? formatTime(f.clock_out_at) : "—"}</div>
+                    <div className="text-[10px] text-slate-500">{f.source} · {minutesToHours(f.worked_minutes ?? 0)}{f.break_minutes ? ` · ${f.break_minutes}min pausa` : ""}</div>
+                  </div>
+                </div>
+                <Badge variant={f.status === "open" ? "green" : f.status === "on_break" ? "amber" : "slate"}>
+                  {f.status === "open" ? "En curso" : f.status === "on_break" ? "Pausa" : "Cerrado"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ═══ MIS AUSENCIAS ═══ */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><CalendarOff className="h-4 w-4 text-brand-500" /> Mis ausencias</CardTitle></CardHeader>
+          <div className="divide-y divide-slate-100">
+            {myAbsences.length === 0 && <div className="p-6 text-center text-sm text-slate-500">No tienes solicitudes de ausencia.</div>}
+            {myAbsences.map((a) => {
+              const type = absenceTypes.find((t) => t.id === a.absence_type_id);
+              const meta = statusAbsence[a.status] ?? statusAbsence.pending;
+              return (
+                <div key={a.id} className="px-5 py-3 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: type?.color ?? "#64748B" }} />
+                      <span className="text-sm font-semibold">{type?.name ?? "—"}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">{a.start_date} → {a.end_date} · {a.days_count} día(s){a.reason ? ` · ${a.reason}` : ""}</div>
+                  </div>
+                  <Badge variant={meta.variant}>{meta.label}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* ═══ MI DISPONIBILIDAD ═══ */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-brand-500" /> Mi disponibilidad</CardTitle></CardHeader>
+          <CardBody>
+            <div className="space-y-1">
+              {DAYS_SHORT.map((day, i) => {
+                const avail = myAvailability.find((a) => a.day_of_week === i);
+                const available = avail ? avail.available : true;
+                return (
+                  <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50">
+                    <span className="text-xs font-bold text-slate-600 w-12">{day}</span>
+                    {available ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="green">Disponible</Badge>
+                        {avail?.preferred_start && (
+                          <span className="text-[10px] text-slate-400 tabular-nums">{avail.preferred_start} – {avail.preferred_end}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="red">No disponible</Badge>
+                        {avail?.notes && <span className="text-[10px] text-slate-400">{avail.notes}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
     </div>
   );
 }
