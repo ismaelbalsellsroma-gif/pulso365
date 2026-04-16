@@ -285,3 +285,97 @@ export interface SolverWarning {
   date?: string;
 }
 
+// ===== F5: Ausencias, notificaciones, convenios =====
+
+export interface AbsenceType {
+  id: string;
+  organization_id: string;
+  name: string;
+  code: string;
+  color: string;
+  paid: boolean;
+  generates_vacation: boolean;
+  requires_document: boolean;
+  max_days_year: number | null;
+  active: boolean;
+  sort_order: number;
+}
+
+export type AbsenceStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface AbsenceRequest {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  absence_type_id: string;
+  start_date: string;
+  end_date: string;
+  days_count: number;
+  half_day: boolean;
+  status: AbsenceStatus;
+  reason: string | null;
+  document_url: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AbsenceBalance {
+  id: string;
+  employee_id: string;
+  absence_type_id: string;
+  year: number;
+  entitled_days: number;
+  used_days: number;
+  pending_days: number;
+  carried_over: number;
+}
+
+export type NotificationType =
+  | "schedule_published" | "shift_changed" | "shift_swap_request" | "shift_swap_decided"
+  | "absence_requested" | "absence_decided" | "open_shift_available"
+  | "clock_reminder" | "overtime_alert" | "system";
+
+export interface Notification {
+  id: string;
+  organization_id: string;
+  recipient_employee_id: string | null;
+  recipient_profile_id: string | null;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface LaborLawES {
+  id: string;
+  organization_id: string;
+  convenio: "hosteleria" | "comercio" | "construccion" | "oficinas" | "custom";
+  max_hours_year: number;
+  max_hours_day: number;
+  max_hours_week: number;
+  max_overtime_hours_year: number;
+  min_rest_daily_h: number;
+  min_rest_weekly_h: number;
+  min_break_after_hours: number;
+  min_break_minutes: number;
+  sunday_surcharge_pct: number;
+  holiday_surcharge_pct: number;
+  national_holidays: string[];
+  regional_holidays: string[];
+  night_start: string;
+  night_end: string;
+  night_surcharge_pct: number;
+  overtime_first_hours: number;
+  overtime_first_pct: number;
+  overtime_after_pct: number;
+  vacation_days_year: number;
+  vacation_accrual_start: string;
+  trial_period_days: number;
+  active: boolean;
+}
+

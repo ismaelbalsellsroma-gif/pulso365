@@ -11,6 +11,8 @@ import LocationsPage from "@/pages/LocationsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import CuadrantePage from "@/pages/CuadrantePage";
 import CuadranteIAPage from "@/pages/CuadranteIAPage";
+import AusenciasPage from "@/pages/AusenciasPage";
+import ReportesPage from "@/pages/ReportesPage";
 import KioskPage from "@/pages/KioskPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -45,6 +47,8 @@ export default function App() {
           <Route path="fichaje" element={<FichajePage profile={profile} />} />
           <Route path="cuadrante" element={<CuadrantePage profile={profile} />} />
           <Route path="cuadrante-ia" element={<CuadranteIAPage profile={profile} />} />
+          <Route path="ausencias" element={<AusenciasPage profile={profile} />} />
+          <Route path="reportes" element={<ReportesPage profile={profile} />} />
           <Route path="empleados" element={<EmployeesPage profile={profile} />} />
           <Route path="locales" element={<LocationsPage profile={profile} />} />
           <Route path="ajustes" element={<SettingsPage profile={profile} />} />

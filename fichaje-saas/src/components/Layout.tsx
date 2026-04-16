@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  BarChart3,
   CalendarDays,
+  CalendarOff,
   Clock,
   LayoutDashboard,
   Users,
@@ -30,6 +32,8 @@ const NAV: NavItem[] = [
   { to: "/app/fichaje", icon: Clock, label: "Fichajes en vivo", roles: ["admin", "manager"] },
   { to: "/app/cuadrante", icon: CalendarDays, label: "Cuadrante", roles: ["admin", "manager"] },
   { to: "/app/cuadrante-ia", icon: Sparkles, label: "Generar con IA", roles: ["admin", "manager"] },
+  { to: "/app/ausencias", icon: CalendarOff, label: "Ausencias", roles: ["admin", "manager"] },
+  { to: "/app/reportes", icon: BarChart3, label: "Reportes", roles: ["admin", "manager"] },
   { to: "/app/empleados", icon: Users, label: "Empleados", roles: ["admin", "manager"] },
   { to: "/app/locales", icon: MapPin, label: "Locales", roles: ["admin", "manager"] },
   { to: "/app/ajustes", icon: Settings, label: "Ajustes", roles: ["admin"] },

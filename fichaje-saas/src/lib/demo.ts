@@ -1,6 +1,7 @@
 import type {
+  AbsenceBalance, AbsenceRequest, AbsenceType,
   DemandForecast, Employee, EmployeeAvailability, Fichaje, FichajeBreak,
-  LaborRules, Location, Organization, Profile, ShiftPlan, ShiftPlanItem,
+  LaborRules, Location, Notification, Organization, Profile, ShiftPlan, ShiftPlanItem,
   ShiftTemplate, StaffingRule,
 } from "@/types";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -312,6 +313,79 @@ export function getDemoAvailability(): EmployeeAvailability[] {
     { id: "av-6", employee_id: "emp-005", day_of_week: 3, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
     { id: "av-7", employee_id: "emp-005", day_of_week: 4, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
   ];
+}
+
+// ===== F5: Ausencias, reportes, notificaciones =====
+
+export function getDemoAbsenceTypes(): AbsenceType[] {
+  return [
+    { id: "at-1", organization_id: ORG_ID, name: "Vacaciones", code: "VAC", color: "#3B82F6", paid: true, generates_vacation: false, requires_document: false, max_days_year: 30, active: true, sort_order: 0 },
+    { id: "at-2", organization_id: ORG_ID, name: "Baja médica", code: "IT", color: "#EF4444", paid: true, generates_vacation: true, requires_document: true, max_days_year: null, active: true, sort_order: 1 },
+    { id: "at-3", organization_id: ORG_ID, name: "Asuntos propios", code: "AP", color: "#F97316", paid: false, generates_vacation: false, requires_document: false, max_days_year: 3, active: true, sort_order: 2 },
+    { id: "at-4", organization_id: ORG_ID, name: "Permiso no retribuido", code: "PNR", color: "#64748B", paid: false, generates_vacation: false, requires_document: false, max_days_year: null, active: true, sort_order: 3 },
+  ];
+}
+
+export function getDemoAbsenceRequests(): AbsenceRequest[] {
+  return [
+    { id: "ar-1", organization_id: ORG_ID, employee_id: "emp-001", absence_type_id: "at-1", start_date: "2026-05-01", end_date: "2026-05-10", days_count: 8, half_day: false, status: "approved", reason: "Vacaciones de primavera", document_url: null, decided_by: ADMIN_PROFILE_ID, decided_at: "2026-04-10T10:00:00Z", decision_notes: null, created_at: "2026-04-05T09:00:00Z", updated_at: "2026-04-10T10:00:00Z" },
+    { id: "ar-2", organization_id: ORG_ID, employee_id: "emp-003", absence_type_id: "at-3", start_date: "2026-04-18", end_date: "2026-04-18", days_count: 1, half_day: false, status: "pending", reason: "Mudanza", document_url: null, decided_by: null, decided_at: null, decision_notes: null, created_at: "2026-04-15T08:00:00Z", updated_at: "2026-04-15T08:00:00Z" },
+    { id: "ar-3", organization_id: ORG_ID, employee_id: "emp-002", absence_type_id: "at-2", start_date: "2026-04-07", end_date: "2026-04-11", days_count: 5, half_day: false, status: "approved", reason: "Gripe", document_url: null, decided_by: ADMIN_PROFILE_ID, decided_at: "2026-04-07T11:00:00Z", decision_notes: null, created_at: "2026-04-07T07:00:00Z", updated_at: "2026-04-07T11:00:00Z" },
+    { id: "ar-4", organization_id: ORG_ID, employee_id: "emp-005", absence_type_id: "at-1", start_date: "2026-06-15", end_date: "2026-06-30", days_count: 12, half_day: false, status: "pending", reason: "Vacaciones verano", document_url: null, decided_by: null, decided_at: null, decision_notes: null, created_at: "2026-04-14T14:00:00Z", updated_at: "2026-04-14T14:00:00Z" },
+  ];
+}
+
+export function getDemoAbsenceBalances(): AbsenceBalance[] {
+  const year = new Date().getFullYear();
+  return [
+    { id: "ab-1", employee_id: "emp-001", absence_type_id: "at-1", year, entitled_days: 30, used_days: 8, pending_days: 0, carried_over: 2 },
+    { id: "ab-2", employee_id: "emp-002", absence_type_id: "at-1", year, entitled_days: 30, used_days: 0, pending_days: 0, carried_over: 0 },
+    { id: "ab-3", employee_id: "emp-003", absence_type_id: "at-1", year, entitled_days: 30, used_days: 3, pending_days: 1, carried_over: 0 },
+    { id: "ab-4", employee_id: "emp-004", absence_type_id: "at-1", year, entitled_days: 30, used_days: 12, pending_days: 0, carried_over: 4 },
+    { id: "ab-5", employee_id: "emp-005", absence_type_id: "at-1", year, entitled_days: 30, used_days: 0, pending_days: 12, carried_over: 0 },
+    { id: "ab-6", employee_id: "emp-001", absence_type_id: "at-3", year, entitled_days: 3, used_days: 1, pending_days: 0, carried_over: 0 },
+    { id: "ab-7", employee_id: "emp-002", absence_type_id: "at-2", year, entitled_days: 0, used_days: 5, pending_days: 0, carried_over: 0 },
+  ];
+}
+
+export function getDemoNotifications(): Notification[] {
+  return [
+    { id: "n-1", organization_id: ORG_ID, recipient_employee_id: null, recipient_profile_id: ADMIN_PROFILE_ID, type: "absence_requested", title: "Pablo solicita 1 día de asuntos propios", body: "18 abr — Mudanza", link: "/app/ausencias", read: false, created_at: minsAgo(30) },
+    { id: "n-2", organization_id: ORG_ID, recipient_employee_id: null, recipient_profile_id: ADMIN_PROFILE_ID, type: "absence_requested", title: "Javier solicita 12 días de vacaciones", body: "15-30 jun", link: "/app/ausencias", read: false, created_at: hoursAgo(2) },
+    { id: "n-3", organization_id: ORG_ID, recipient_employee_id: null, recipient_profile_id: ADMIN_PROFILE_ID, type: "overtime_alert", title: "Ana acumula 42h esta semana", body: "Supera el límite de 40h/semana", link: "/app/reportes", read: true, created_at: hoursAgo(5) },
+    { id: "n-4", organization_id: ORG_ID, recipient_employee_id: null, recipient_profile_id: ADMIN_PROFILE_ID, type: "schedule_published", title: "Cuadrante publicado", body: "Semana del 20 abr", link: "/app/cuadrante", read: true, created_at: hoursAgo(24) },
+  ];
+}
+
+export function getDemoReportFichajes(from: string, to: string): Fichaje[] {
+  const base = getDemoFichajes();
+  // Generamos fichajes cerrados de días anteriores para el reporte
+  const extra: Fichaje[] = [];
+  const emps = ["emp-001","emp-002","emp-003","emp-004","emp-005"];
+  for (let d = 1; d <= 7; d++) {
+    const date = format(addDays(new Date(from + "T00:00:00"), d), "yyyy-MM-dd");
+    if (date > to) break;
+    emps.forEach((empId, i) => {
+      if (Math.random() < 0.3) return; // 30% no trabaja
+      const hours = 6 + Math.floor(Math.random() * 4);
+      const startH = 8 + (i % 2 === 0 ? 0 : 8);
+      const worked = hours * 60 - 30;
+      extra.push({
+        id: `rep-${d}-${i}`, organization_id: ORG_ID, employee_id: empId,
+        location_id: LOC_1, work_date: date,
+        clock_in_at: `${date}T${String(startH).padStart(2,"0")}:0${i}:00Z`,
+        clock_out_at: `${date}T${String(startH + hours).padStart(2,"0")}:0${i}:00Z`,
+        worked_minutes: worked, break_minutes: 30, status: "closed", source: "kiosk",
+        clock_in_lat: 40.4168, clock_in_lng: -3.7038, clock_in_accuracy_m: 10,
+        clock_out_lat: 40.4168, clock_out_lng: -3.7038, clock_out_accuracy_m: 10,
+        within_geofence: i !== 4, distance_from_location_m: i === 4 ? 3500 : 15,
+        clock_in_photo_url: null, clock_out_photo_url: null,
+        user_agent: null, ip_address: null, device_fingerprint: null,
+        notes: null, edited_by: null, edited_at: null, created_at: "", updated_at: "",
+      });
+    });
+  }
+  return [...base, ...extra];
 }
 
 /** Detecta si estamos en modo demo */
