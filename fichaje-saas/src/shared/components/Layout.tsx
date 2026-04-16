@@ -62,6 +62,13 @@ export default function Layout({ profile }: { profile: Profile }) {
       window.location.href = "/";
       return;
     }
+    // Employee session (email+PIN)
+    if (localStorage.getItem("fichaje_employee_session")) {
+      localStorage.removeItem("fichaje_employee_session");
+      toast.success("Sesión cerrada");
+      window.location.href = "/";
+      return;
+    }
     await supabase.auth.signOut();
     toast.success("Sesión cerrada");
     navigate("/auth", { replace: true });

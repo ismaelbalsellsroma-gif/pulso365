@@ -38,13 +38,21 @@ export default function MyClockPage({ profile }: { profile: Profile }) {
     return () => clearInterval(i);
   }, []);
 
-  // En demo, usar el primer empleado como "yo"
+  // Detectar si es sesión de empleado por email+PIN
+  const empSession = (() => { try { const r = localStorage.getItem("fichaje_employee_session"); return r ? JSON.parse(r) : null; } catch { return null; } })();
   const demoEmployee = demo ? DEMO_EMPLOYEES[0] : null;
 
   const { data: employee } = useQuery({
     queryKey: ["me-employee", profile.id],
     queryFn: async () => {
       if (demo) return demoEmployee;
+      // Si es sesión de empleado por email+PIN, buscar por ID
+      if (empSession?.employee?.id) {
+        const { data } = await supabase.from("employees").select("*")
+          .eq("id", empSession.employee.id).eq("active", true).maybeSingle();
+        return (data as Employee | null) ?? null;
+      }
+      // Si es sesión normal Supabase, buscar por profile_id
       const { data } = await supabase.from("employees").select("*")
         .eq("profile_id", profile.id).eq("active", true).maybeSingle();
       return (data as Employee | null) ?? null;
