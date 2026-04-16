@@ -123,6 +123,14 @@ export default function FichajePage({ profile }: Props) {
     return f?.within_geofence === false;
   }).length;
 
+  // Missed punches: turnos abiertos m\u00e1s de 14 horas (probablemente olvidado)
+  const MAX_OPEN_HOURS = 14;
+  const missedPunches = todayFichajes.filter((f) => {
+    if (f.status !== "open") return false;
+    const openMinutes = computeWorkedMinutes(f.clock_in_at, new Date(tick).toISOString(), 0);
+    return openMinutes / 60 > MAX_OPEN_HOURS;
+  });
+
   return (
     <div>
       <PageHeader
@@ -152,6 +160,13 @@ export default function FichajePage({ profile }: Props) {
       {outside > 0 && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
           ⚠ {outside} fichaje(s) abiertos <strong>fuera del geofence</strong> del local.
+        </div>
+      )}
+
+      {missedPunches.length > 0 && (
+        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+          ⏰ <strong>{missedPunches.length} fichaje(s) sin cerrar</strong> hace m\u00e1s de {MAX_OPEN_HOURS}h.
+          {" "}Probablemente alg\u00fan empleado olvid\u00f3 fichar la salida — rev\u00edsalos y corrige manualmente.
         </div>
       )}
 

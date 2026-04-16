@@ -3,20 +3,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, Plus, Trash2, Sparkles, X,
-  Copy, FileText,
+  Copy, FileText, AlertTriangle, AlertCircle, CalendarOff,
 } from "lucide-react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/shared/lib/supabase";
 import {
   isDemoMode, DEMO_EMPLOYEES, getDemoShiftPlan, getDemoShiftItems, DEMO_SHIFT_TEMPLATES,
+  getDemoAbsenceRequests,
 } from "@/demo";
+import { DEMO_RULES } from "@/demo";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { formatMoney } from "@/shared/lib/utils";
-import type { Employee, ShiftPlan, ShiftPlanItem, ShiftTemplate, Profile } from "@/types";
+import type {
+  AbsenceRequest, Employee, LaborRules, Profile,
+  ShiftPlan, ShiftPlanItem, ShiftTemplate,
+} from "@/types";
 import { Link } from "react-router-dom";
+import { validateShift, overtimeStatusFor, type ValidationResult } from "./validation";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -113,6 +119,47 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
     },
   });
 
+  // Ausencias aprobadas (para validar turnos)
+  const { data: approvedAbsences = [] } = useQuery({
+    queryKey: ["absences-approved", orgId],
+    queryFn: async () => {
+      if (demo) return getDemoAbsenceRequests().filter((a) => a.status === "approved");
+      const { data } = await supabase
+        .from("absence_requests").select("*")
+        .eq("organization_id", orgId).eq("status", "approved");
+      return (data as AbsenceRequest[]) ?? [];
+    },
+  });
+
+  // Reglas laborales (para validar duraciones, descansos, etc.)
+  const { data: laborRules } = useQuery({
+    queryKey: ["labor-rules", orgId],
+    queryFn: async () => {
+      if (demo) return DEMO_RULES;
+      const { data } = await supabase.from("labor_rules").select("*").eq("organization_id", orgId).maybeSingle();
+      return (data as LaborRules | null) ?? DEMO_RULES;
+    },
+  });
+
+  // Validaciones del turno actual (en el modal)
+  const validations: ValidationResult[] = useMemo(() => {
+    if (!dialogOpen || !form.employee_id || !form.work_date) return [];
+    return validateShift(
+      {
+        id: editId ?? undefined,
+        employee_id: form.employee_id!,
+        work_date: form.work_date!,
+        start_time: form.start_time ?? "09:00",
+        end_time: form.end_time ?? "17:00",
+        break_minutes: form.break_minutes ?? 0,
+        role: form.role ?? null,
+      },
+      { employees, existingShifts: items, approvedAbsences, laborRules: laborRules ?? null }
+    );
+  }, [dialogOpen, form, editId, employees, items, approvedAbsences, laborRules]);
+
+  const blockingViolations = validations.filter((v) => v.blocking);
+
   const saveMut = useMutation({
     mutationFn: async () => {
       if (demo) { toast.info("Modo demo — los cambios no se guardan"); return; }
@@ -194,6 +241,24 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
 
   const unassignedItems = items.filter((it) => it.is_open_shift);
   const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  // Helper: \u00bfest\u00e1 ese empleado de ausencia ese d\u00eda?
+  function absenceOnDate(employeeId: string, dateStr: string): AbsenceRequest | null {
+    return approvedAbsences.find(
+      (a) => a.employee_id === employeeId && dateStr >= a.start_date && dateStr <= a.end_date
+    ) ?? null;
+  }
+
+  // Overtime status del empleado en esta semana
+  function empOvertimeStatus(employeeId: string, contractWeekly: number | null) {
+    return overtimeStatusFor(
+      employeeId,
+      format(weekDates[0], "yyyy-MM-dd"),
+      format(weekDates[6], "yyyy-MM-dd"),
+      contractWeekly,
+      items
+    );
+  }
 
   return (
     <div>
@@ -317,9 +382,15 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
                       const dateStr = format(d, "yyyy-MM-dd");
                       const dayItems = items.filter((it) => it.employee_id === emp.id && it.work_date === dateStr && !it.is_open_shift);
                       const isToday = dateStr === todayStr;
+                      const absence = absenceOnDate(emp.id, dateStr);
                       return (
                         <td key={i} className={`px-1 py-1 text-center align-top ${isToday ? "bg-brand-50/30" : ""}`}>
-                          {dayItems.length > 0 ? (
+                          {absence ? (
+                            <div className="w-full h-10 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-semibold flex items-center justify-center gap-1" title={`Ausencia aprobada: ${absence.reason ?? ""}`}>
+                              <CalendarOff className="h-3 w-3" />
+                              Ausente
+                            </div>
+                          ) : dayItems.length > 0 ? (
                             dayItems.map((it) => <ShiftBlock key={it.id} item={it} onClick={() => openEdit(it)} />)
                           ) : (
                             <button onClick={() => openNew(emp.id, dateStr)} className="w-full h-10 rounded-lg border border-dashed border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all text-slate-300 hover:text-brand-500 text-xs flex items-center justify-center">
@@ -330,8 +401,14 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
                       );
                     })}
 
-                    <td className="px-2 py-2 text-center border-l border-slate-200 bg-slate-50">
-                      <div className="font-mono text-xs font-bold text-slate-800">{formatHM(weekH)}</div>
+                    <td className={`px-2 py-2 text-center border-l border-slate-200 ${
+                      empOvertimeStatus(emp.id, contractH) === "danger" ? "bg-red-50" :
+                      empOvertimeStatus(emp.id, contractH) === "warning" ? "bg-amber-50" : "bg-slate-50"
+                    }`}>
+                      <div className={`font-mono text-xs font-bold ${
+                        empOvertimeStatus(emp.id, contractH) === "danger" ? "text-red-700" :
+                        empOvertimeStatus(emp.id, contractH) === "warning" ? "text-amber-700" : "text-slate-800"
+                      }`}>{formatHM(weekH)}</div>
                     </td>
                     <td className="px-2 py-2 text-center bg-slate-50">
                       {diff > 0 && <div className="text-[10px] font-bold text-amber-600">+ {formatHM(diff)}</div>}
@@ -473,6 +550,29 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
                   Para crear una ausencia, ve a la secci\u00f3n <Link to="/app/ausencias" className="text-brand-600 font-semibold hover:underline">Ausencias</Link>.
                 </div>
               )}
+
+              {/* Panel de validaciones */}
+              {dialogTab === "turno" && validations.length > 0 && (
+                <div className="space-y-1.5 mt-2">
+                  {validations.map((v, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-start gap-2 rounded-lg p-2.5 text-xs ${
+                        v.severity === "error"
+                          ? "bg-red-50 border border-red-200 text-red-800"
+                          : "bg-amber-50 border border-amber-200 text-amber-800"
+                      }`}
+                    >
+                      {v.severity === "error" ? (
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      )}
+                      <span className="font-medium">{v.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {dialogTab === "turno" && (
@@ -483,7 +583,13 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
                 </div>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                  <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>{saveMut.isPending ? "Guardando..." : "Guardar"}</Button>
+                  <Button
+                    onClick={() => saveMut.mutate()}
+                    disabled={saveMut.isPending || blockingViolations.length > 0}
+                    title={blockingViolations.length > 0 ? "Resuelve los conflictos para guardar" : ""}
+                  >
+                    {saveMut.isPending ? "Guardando..." : "Guardar"}
+                  </Button>
                 </div>
               </div>
             )}

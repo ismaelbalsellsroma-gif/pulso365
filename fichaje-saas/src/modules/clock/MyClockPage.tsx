@@ -17,6 +17,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useGeolocation } from "@/shared/hooks/useGeolocation";
+import { checkGeofence } from "@/shared/lib/geo";
 import {
   computeWorkedMinutes, formatLongDate, formatTime, minutesToHours, todayDate,
 } from "@/shared/lib/time";
@@ -179,9 +180,24 @@ export default function MyClockPage({ profile }: { profile: Profile }) {
   const isWorking = openFichaje?.status === "open";
   const isOnBreak = openFichaje?.status === "on_break";
 
+  // Geofence: si la regla est\u00e1 activa y est\u00e1 fuera de zona, bloquear botones
+  const fenceCheck = useMemo(() => {
+    if (geo.state.status !== "ok" || !location?.latitude || !location?.longitude) return null;
+    return checkGeofence(geo.state.coords, location);
+  }, [geo.state, location]);
+
+  const geoBlocked = !!(rules?.require_geofence && fenceCheck && !fenceCheck.withinFence);
+  const geoWaiting = !!(rules?.require_geofence && (geo.state.status === "loading" || geo.state.status === "idle"));
+
   // Demo actions
-  function handleClockIn() { toast.success("Entrada registrada (demo)"); }
-  function handleClockOut() { toast.success("Salida registrada (demo)"); }
+  function handleClockIn() {
+    if (geoBlocked) { toast.error(`Est\u00e1s a ${Math.round(fenceCheck!.distance)}m del local. Acerc\u00e1te para fichar.`); return; }
+    toast.success("Entrada registrada (demo)");
+  }
+  function handleClockOut() {
+    if (geoBlocked) { toast.error(`Est\u00e1s a ${Math.round(fenceCheck!.distance)}m del local. Acerc\u00e1te para fichar.`); return; }
+    toast.success("Salida registrada (demo)");
+  }
   function handleStartBreak() { toast.success("Pausa iniciada (demo)"); }
   function handleEndBreak() { toast.success("Pausa finalizada (demo)"); }
 
@@ -223,23 +239,36 @@ export default function MyClockPage({ profile }: { profile: Profile }) {
 
           {/* Geofence chips */}
           <div className="flex flex-wrap justify-center gap-2 mt-4">
-            {geo.state.status === "ok" && location && (
+            {geoBlocked && fenceCheck && (
+              <Badge variant="red">
+                <MapPin className="h-3 w-3" /> Fuera de zona ({Math.round(fenceCheck.distance)}m)
+              </Badge>
+            )}
+            {!geoBlocked && geo.state.status === "ok" && location && (
               <Badge variant="green"><MapPin className="h-3 w-3" /> {location.name}</Badge>
             )}
             {geo.state.status === "denied" && <Badge variant="red"><MapPin className="h-3 w-3" /> Sin GPS</Badge>}
+            {geoWaiting && <Badge variant="amber"><MapPin className="h-3 w-3" /> Comprobando ubicaci\u00f3n...</Badge>}
           </div>
+
+          {/* Aviso de bloqueo */}
+          {geoBlocked && (
+            <div className="mt-3 mx-auto max-w-md rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-800">
+              No puedes fichar fuera del local. Acerc\u00e1te para activar el bot\u00f3n.
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap justify-center gap-2 mt-6">
             {!openFichaje && (
-              <Button size="xl" variant="success" onClick={handleClockIn} className="min-w-[180px]">
+              <Button size="xl" variant="success" onClick={handleClockIn} disabled={geoBlocked || geoWaiting} className="min-w-[180px]">
                 <LogIn className="h-5 w-5" /> Fichar entrada
               </Button>
             )}
             {isWorking && (
               <>
                 <Button size="xl" variant="warning" onClick={handleStartBreak}><Coffee className="h-5 w-5" /> Pausa</Button>
-                <Button size="xl" variant="danger" onClick={handleClockOut} className="min-w-[180px]"><LogOut className="h-5 w-5" /> Fichar salida</Button>
+                <Button size="xl" variant="danger" onClick={handleClockOut} disabled={geoBlocked} className="min-w-[180px]"><LogOut className="h-5 w-5" /> Fichar salida</Button>
               </>
             )}
             {isOnBreak && (
