@@ -11,6 +11,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Card } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
 import { getCurrentPosition } from "@/shared/lib/geo";
+import { DAY_KEYS, DEFAULT_OPENING_HOURS, type DayKey, type DayOpeningHours, type OpeningHours } from "@/types/core";
 import type { Location, Profile } from "@/types";
 
 const empty: Partial<Location> = {
@@ -21,6 +22,7 @@ const empty: Partial<Location> = {
   geofence_radius_m: 100,
   active: true,
   kiosk_enabled: true,
+  opening_hours: DEFAULT_OPENING_HOURS,
 };
 
 export default function LocationsPage({ profile }: { profile: Profile }) {
@@ -147,6 +149,24 @@ export default function LocationsPage({ profile }: { profile: Profile }) {
                     )}
                     {loc.kiosk_enabled && <Badge variant="slate">Kiosco ON</Badge>}
                   </div>
+                  {/* Horario de apertura */}
+                  {loc.opening_hours && (
+                    <div className="mt-3 grid grid-cols-7 gap-1">
+                      {DAY_KEYS.map((day) => {
+                        const h = loc.opening_hours![day];
+                        const dayShort = { mon: "L", tue: "M", wed: "X", thu: "J", fri: "V", sat: "S", sun: "D" }[day];
+                        return (
+                          <div key={day} className="text-center" title={h.open ? `${h.from} - ${h.to}` : "Cerrado"}>
+                            <div className={`text-[9px] font-bold ${h.open ? "text-slate-600" : "text-slate-300"}`}>{dayShort}</div>
+                            <div className={`mt-0.5 mx-auto h-1 w-1 rounded-full ${h.open ? "bg-emerald-500" : "bg-slate-200"}`} />
+                            {h.open && (
+                              <div className="text-[8px] text-slate-400 tabular-nums mt-0.5">{h.from.slice(0,5)}<br/>{h.to.slice(0,5)}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
@@ -273,6 +293,104 @@ export default function LocationsPage({ profile }: { profile: Profile }) {
                 />
                 Habilitar modo kiosco en este local
               </label>
+
+              {/* ═══ HORARIOS DE APERTURA ═══ */}
+              <div className="pt-3 border-t border-slate-200">
+                <Label className="text-sm font-semibold">Horario de apertura</Label>
+                <p className="text-xs text-slate-500 mt-1 mb-3">
+                  Estos horarios se usan para validar turnos y generar cuadrantes con IA.
+                </p>
+                <div className="space-y-1.5">
+                  {DAY_KEYS.map((day) => {
+                    const hours: DayOpeningHours = (editing.opening_hours as OpeningHours | null)?.[day] ?? DEFAULT_OPENING_HOURS[day];
+                    const dayLabel = { mon: "Lunes", tue: "Martes", wed: "Miércoles", thu: "Jueves", fri: "Viernes", sat: "Sábado", sun: "Domingo" }[day];
+                    return (
+                      <div key={day} className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 w-28 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={hours.open}
+                            onChange={(e) => {
+                              const oh = (editing.opening_hours as OpeningHours | null) ?? DEFAULT_OPENING_HOURS;
+                              setEditing({
+                                ...editing,
+                                opening_hours: { ...oh, [day]: { ...hours, open: e.target.checked } },
+                              });
+                            }}
+                          />
+                          <span className="text-xs font-semibold">{dayLabel}</span>
+                        </label>
+                        {hours.open ? (
+                          <>
+                            <Input
+                              type="time"
+                              className="w-24 h-8 text-xs tabular-nums"
+                              value={hours.from}
+                              onChange={(e) => {
+                                const oh = (editing.opening_hours as OpeningHours | null) ?? DEFAULT_OPENING_HOURS;
+                                setEditing({
+                                  ...editing,
+                                  opening_hours: { ...oh, [day]: { ...hours, from: e.target.value } },
+                                });
+                              }}
+                            />
+                            <span className="text-slate-400 text-xs">—</span>
+                            <Input
+                              type="time"
+                              className="w-24 h-8 text-xs tabular-nums"
+                              value={hours.to}
+                              onChange={(e) => {
+                                const oh = (editing.opening_hours as OpeningHours | null) ?? DEFAULT_OPENING_HOURS;
+                                setEditing({
+                                  ...editing,
+                                  opening_hours: { ...oh, [day]: { ...hours, to: e.target.value } },
+                                });
+                              }}
+                            />
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Cerrado</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Botones rápidos */}
+                <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    className="text-xs text-brand-600 font-semibold hover:underline"
+                    onClick={() => {
+                      const all: OpeningHours = { ...DEFAULT_OPENING_HOURS };
+                      DAY_KEYS.forEach((d) => { all[d] = { ...all[d], open: true, from: "09:00", to: "17:00" }; });
+                      setEditing({ ...editing, opening_hours: all });
+                    }}
+                  >
+                    Lun-Dom 9-17
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-brand-600 font-semibold hover:underline"
+                    onClick={() => {
+                      const oh: OpeningHours = { ...DEFAULT_OPENING_HOURS };
+                      ["mon","tue","wed","thu"].forEach((d) => { oh[d as DayKey] = { open: true, from: "08:00", to: "00:00" }; });
+                      ["fri","sat"].forEach((d) => { oh[d as DayKey] = { open: true, from: "08:00", to: "02:00" }; });
+                      oh.sun = { open: true, from: "10:00", to: "18:00" };
+                      setEditing({ ...editing, opening_hours: oh });
+                    }}
+                  >
+                    Restaurante típico
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-slate-500 font-semibold hover:underline"
+                    onClick={() => setEditing({ ...editing, opening_hours: DEFAULT_OPENING_HOURS })}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2">
               <Button

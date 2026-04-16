@@ -10,7 +10,7 @@ import { es } from "date-fns/locale";
 import { supabase } from "@/shared/lib/supabase";
 import {
   isDemoMode, DEMO_EMPLOYEES, getDemoShiftPlan, getDemoShiftItems, DEMO_SHIFT_TEMPLATES,
-  getDemoAbsenceRequests,
+  getDemoAbsenceRequests, DEMO_LOCATIONS,
 } from "@/demo";
 import { DEMO_RULES } from "@/demo";
 import { Button } from "@/shared/components/ui/button";
@@ -18,7 +18,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { formatMoney } from "@/shared/lib/utils";
 import type {
-  AbsenceRequest, Employee, LaborRules, Profile,
+  AbsenceRequest, Employee, LaborRules, Location, Profile,
   ShiftPlan, ShiftPlanItem, ShiftTemplate,
 } from "@/types";
 import { Link } from "react-router-dom";
@@ -141,9 +141,22 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
     },
   });
 
+  // Locales (para horario de apertura)
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations-all", orgId],
+    queryFn: async () => {
+      if (demo) return DEMO_LOCATIONS;
+      const { data } = await supabase.from("locations").select("*").eq("organization_id", orgId).eq("active", true);
+      return (data as Location[]) ?? [];
+    },
+  });
+
   // Validaciones del turno actual (en el modal)
   const validations: ValidationResult[] = useMemo(() => {
     if (!dialogOpen || !form.employee_id || !form.work_date) return [];
+    // Determinar local del empleado
+    const emp = employees.find((e) => e.id === form.employee_id);
+    const loc = locations.find((l) => l.id === emp?.primary_location_id) ?? locations[0] ?? null;
     return validateShift(
       {
         id: editId ?? undefined,
@@ -154,9 +167,9 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
         break_minutes: form.break_minutes ?? 0,
         role: form.role ?? null,
       },
-      { employees, existingShifts: items, approvedAbsences, laborRules: laborRules ?? null }
+      { employees, existingShifts: items, approvedAbsences, laborRules: laborRules ?? null, location: loc }
     );
-  }, [dialogOpen, form, editId, employees, items, approvedAbsences, laborRules]);
+  }, [dialogOpen, form, editId, employees, items, approvedAbsences, laborRules, locations]);
 
   const blockingViolations = validations.filter((v) => v.blocking);
 

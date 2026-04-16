@@ -44,6 +44,35 @@ export interface Employee {
   updated_at: string;
 }
 
+export interface DayOpeningHours {
+  open: boolean;
+  from: string;  // "HH:MM"
+  to: string;    // "HH:MM" — si < from, asume cierre al d\u00eda siguiente
+}
+
+export type OpeningHours = {
+  mon: DayOpeningHours;
+  tue: DayOpeningHours;
+  wed: DayOpeningHours;
+  thu: DayOpeningHours;
+  fri: DayOpeningHours;
+  sat: DayOpeningHours;
+  sun: DayOpeningHours;
+};
+
+export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+export type DayKey = typeof DAY_KEYS[number];
+
+export const DEFAULT_OPENING_HOURS: OpeningHours = {
+  mon: { open: true, from: "08:00", to: "23:00" },
+  tue: { open: true, from: "08:00", to: "23:00" },
+  wed: { open: true, from: "08:00", to: "23:00" },
+  thu: { open: true, from: "08:00", to: "23:00" },
+  fri: { open: true, from: "08:00", to: "00:00" },
+  sat: { open: true, from: "10:00", to: "00:00" },
+  sun: { open: false, from: "10:00", to: "16:00" },
+};
+
 export interface Location {
   id: string;
   organization_id: string;
@@ -55,6 +84,7 @@ export interface Location {
   geofence_radius_m: number;
   kiosk_enabled: boolean;
   active: boolean;
+  opening_hours: OpeningHours | null;
   created_at: string;
   updated_at: string;
 }

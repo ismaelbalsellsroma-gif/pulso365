@@ -6,8 +6,9 @@
  */
 
 import type {
-  AbsenceRequest, Employee, LaborRules, ShiftPlanItem,
+  AbsenceRequest, Employee, LaborRules, Location, ShiftPlanItem,
 } from "@/types";
+import { DAY_KEYS, type DayKey } from "@/types/core";
 
 export type ValidationSeverity = "error" | "warning" | "info";
 
@@ -21,7 +22,9 @@ export interface ValidationResult {
     | "no_break"          // Turno > 6h sin pausa
     | "weekly_rest"       // Sin descanso semanal
     | "no_skill"          // Empleado sin la habilidad requerida
-    | "outside_availability"; // Fuera de disponibilidad declarada
+    | "outside_availability"  // Fuera de disponibilidad declarada
+    | "outside_opening"   // Fuera del horario de apertura del local
+    | "location_closed";  // El local est\u00e1 cerrado ese d\u00eda
   severity: ValidationSeverity;
   message: string;
   blocking?: boolean;     // Si true, no se debe permitir guardar
@@ -32,6 +35,7 @@ export interface ValidationContext {
   existingShifts: ShiftPlanItem[];   // Turnos ya planificados (otros)
   approvedAbsences: AbsenceRequest[]; // Ausencias aprobadas
   laborRules: LaborRules | null;
+  location?: Location | null;        // Para validar contra horario de apertura
 }
 
 /**
@@ -118,8 +122,39 @@ export function validateShift(
   ctx: ValidationContext
 ): ValidationResult[] {
   const results: ValidationResult[] = [];
-  const { employees, existingShifts, approvedAbsences, laborRules } = ctx;
+  const { employees, existingShifts, approvedAbsences, laborRules, location } = ctx;
   const emp = employees.find((e) => e.id === shift.employee_id);
+
+  // ============ HORARIO DE APERTURA DEL LOCAL ============
+  if (location?.opening_hours) {
+    const dayIdx = (new Date(shift.work_date + "T00:00:00").getDay() + 6) % 7; // 0=lunes
+    const dayKey: DayKey = DAY_KEYS[dayIdx];
+    const day = location.opening_hours[dayKey];
+    if (day && !day.open) {
+      results.push({
+        type: "location_closed",
+        severity: "warning",
+        message: `${location.name} est\u00e1 cerrado el ${["lunes","martes","mi\u00e9rcoles","jueves","viernes","s\u00e1bado","domingo"][dayIdx]}`,
+      });
+    } else if (day && day.open) {
+      // Comprobar que el turno cae dentro de la franja de apertura
+      const openMin = timeToMin(day.from);
+      let closeMin = timeToMin(day.to);
+      if (closeMin <= openMin) closeMin += 24 * 60; // cierra al d\u00eda siguiente
+
+      const shiftStart = timeToMin(shift.start_time);
+      let shiftEnd = timeToMin(shift.end_time);
+      if (shiftEnd <= shiftStart) shiftEnd += 24 * 60;
+
+      if (shiftStart < openMin || shiftEnd > closeMin) {
+        results.push({
+          type: "outside_opening",
+          severity: "warning",
+          message: `Turno fuera del horario de apertura (${day.from} - ${day.to})`,
+        });
+      }
+    }
+  }
 
   // ============ AUSENCIA APROBADA ============
   const conflictAbsence = approvedAbsences.find(
