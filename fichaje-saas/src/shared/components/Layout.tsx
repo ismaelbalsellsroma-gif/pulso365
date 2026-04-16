@@ -32,20 +32,22 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: "/app", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/app/my-clock", icon: Timer, label: "Mi fichaje" },
+  // Manager / Admin
+  { to: "/app", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "manager"] },
   { to: "/app/fichaje", icon: Clock, label: "Fichajes en vivo", roles: ["admin", "manager"] },
   { to: "/app/planificado-vs-real", icon: GitCompareArrows, label: "Plan vs Real", roles: ["admin", "manager"] },
   { to: "/app/cuadrante", icon: CalendarDays, label: "Cuadrante", roles: ["admin", "manager"] },
   { to: "/app/cuadrante-dia", icon: CalendarClock, label: "Vista día", roles: ["admin", "manager"] },
   { to: "/app/cuadrante-ia", icon: Sparkles, label: "Generar con IA", roles: ["admin", "manager"] },
-  { to: "/app/ausencias", icon: CalendarOff, label: "Ausencias" },
-  { to: "/app/swaps", icon: ArrowLeftRight, label: "Intercambios", roles: ["admin", "manager"] },
   { to: "/app/reportes", icon: BarChart3, label: "Reportes", roles: ["admin", "manager"] },
   { to: "/app/nomina", icon: Euro, label: "Nómina", roles: ["admin", "manager"] },
   { to: "/app/empleados", icon: Users, label: "Empleados", roles: ["admin", "manager"] },
   { to: "/app/locales", icon: MapPin, label: "Locales", roles: ["admin", "manager"] },
   { to: "/app/ajustes", icon: Settings, label: "Ajustes", roles: ["admin"] },
+  // Empleado (y también visible para managers)
+  { to: "/app/my-clock", icon: Timer, label: "Mi fichaje" },
+  { to: "/app/ausencias", icon: CalendarOff, label: "Mis ausencias" },
+  { to: "/app/swaps", icon: ArrowLeftRight, label: "Intercambios" },
 ];
 
 export default function Layout({ profile }: { profile: Profile }) {

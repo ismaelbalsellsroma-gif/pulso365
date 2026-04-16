@@ -45,7 +45,11 @@ export default function App() {
       {/* Protected */}
       {session && profile ? (
         <Route path="/app" element={<Layout profile={profile} />}>
-          <Route index element={<DashboardPage profile={profile} />} />
+          <Route index element={
+            profile.role === "employee"
+              ? <Navigate to="/app/my-clock" replace />
+              : <DashboardPage profile={profile} />
+          } />
           <Route path="my-clock" element={<MyClockPage profile={profile} />} />
           <Route path="fichaje" element={<FichajePage profile={profile} />} />
           <Route path="cuadrante" element={<CuadrantePage profile={profile} />} />
