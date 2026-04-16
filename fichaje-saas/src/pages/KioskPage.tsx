@@ -204,7 +204,7 @@ export default function KioskPage() {
       }
 
       const { data: open } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .select("*")
         .eq("employee_id", emp.id)
         .in("status", ["open", "on_break"])
@@ -252,7 +252,7 @@ export default function KioskPage() {
       toast.error(`Fuera de zona (${Math.round(check.distance)}m)`);
       return;
     }
-    const { error } = await supabase.from("fichajes").insert({
+    const { error } = await supabase.from("clock_sessions").insert({
       organization_id: orgId,
       employee_id: view.employee.id,
       location_id: locationId,
@@ -286,7 +286,7 @@ export default function KioskPage() {
       view.openFichaje.break_minutes
     );
     const { error } = await supabase
-      .from("fichajes")
+      .from("clock_sessions")
       .update({
         clock_out_at: now,
         worked_minutes: worked,
@@ -314,7 +314,7 @@ export default function KioskPage() {
     });
     if (error) return toast.error(error.message);
     await supabase
-      .from("fichajes")
+      .from("clock_sessions")
       .update({ status: "on_break" })
       .eq("id", view.openFichaje.id);
     toast.success("Pausa iniciada");
@@ -333,7 +333,7 @@ export default function KioskPage() {
       .update({ break_end_at: now, duration_minutes: dur })
       .eq("id", view.openBreak.id);
     await supabase
-      .from("fichajes")
+      .from("clock_sessions")
       .update({
         status: "open",
         break_minutes: (view.openFichaje.break_minutes ?? 0) + dur,

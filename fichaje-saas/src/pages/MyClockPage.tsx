@@ -123,7 +123,7 @@ export default function MyClockPage({ profile }: Props) {
     refetchInterval: 15_000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .select("*")
         .eq("employee_id", employee!.id)
         .in("status", ["open", "on_break"])
@@ -157,7 +157,7 @@ export default function MyClockPage({ profile }: Props) {
     enabled: !!employee,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .select("*")
         .eq("employee_id", employee!.id)
         .eq("work_date", todayDate())
@@ -180,7 +180,7 @@ export default function MyClockPage({ profile }: Props) {
           `Estás a ${Math.round(check.distance)}m del local — fuera de la zona permitida`
         );
       }
-      const { error } = await supabase.from("fichajes").insert({
+      const { error } = await supabase.from("clock_sessions").insert({
         organization_id: orgId,
         employee_id: employee.id,
         location_id: employee.primary_location_id,
@@ -218,7 +218,7 @@ export default function MyClockPage({ profile }: Props) {
         openFichaje.break_minutes
       );
       const { error } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .update({
           clock_out_at: now,
           worked_minutes: worked,
@@ -250,7 +250,7 @@ export default function MyClockPage({ profile }: Props) {
       });
       if (e1) throw e1;
       const { error: e2 } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .update({ status: "on_break" })
         .eq("id", openFichaje.id);
       if (e2) throw e2;
@@ -280,7 +280,7 @@ export default function MyClockPage({ profile }: Props) {
         .eq("id", openBreak.id);
       if (e1) throw e1;
       const { error: e2 } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .update({
           status: "open",
           break_minutes: (openFichaje.break_minutes ?? 0) + durationMin,

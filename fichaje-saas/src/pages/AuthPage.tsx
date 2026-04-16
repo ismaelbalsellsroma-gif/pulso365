@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Clock, ArrowLeft } from "lucide-react";
+import { Clock, ArrowLeft, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { enableDemoMode } from "@/lib/demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,6 +151,27 @@ export default function AuthPage() {
                 : mode === "signin"
                 ? "Entrar"
                 : "Crear cuenta"}
+            </Button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-slate-400">o</span></div>
+            </div>
+
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                enableDemoMode();
+                toast.success("Modo demo activado — datos de ejemplo");
+                navigate("/app", { replace: true });
+                window.location.reload();
+              }}
+            >
+              <Play className="h-4 w-4" />
+              Ver demo con datos de ejemplo
             </Button>
 
             <div className="text-center text-sm text-slate-500 pt-2">

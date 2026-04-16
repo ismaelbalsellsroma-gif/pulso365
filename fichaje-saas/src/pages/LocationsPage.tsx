@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, MapPin, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isDemoMode, DEMO_LOCATIONS } from "@/lib/demo";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ const empty: Partial<Location> = {
 
 export default function LocationsPage({ profile }: { profile: Profile }) {
   const orgId = profile.organization_id!;
+  const demo = isDemoMode();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Location> | null>(null);
@@ -31,6 +33,7 @@ export default function LocationsPage({ profile }: { profile: Profile }) {
   const { data: locations = [] } = useQuery({
     queryKey: ["locations", orgId],
     queryFn: async () => {
+      if (demo) return DEMO_LOCATIONS;
       const { data, error } = await supabase
         .from("locations")
         .select("*")

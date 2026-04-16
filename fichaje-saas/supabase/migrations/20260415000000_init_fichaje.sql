@@ -107,7 +107,7 @@ create table if not exists public.labor_rules (
 -- =============================================================================
 -- FICHAJES (sesiones de trabajo — un registro por jornada abierta)
 -- =============================================================================
-create table if not exists public.fichajes (
+create table if not exists public.clock_sessions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   employee_id uuid not null references public.employees(id) on delete cascade,
@@ -142,16 +142,16 @@ create table if not exists public.fichajes (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists fichajes_org_date_idx on public.fichajes(organization_id, work_date);
-create index if not exists fichajes_employee_date_idx on public.fichajes(employee_id, work_date);
-create index if not exists fichajes_status_idx on public.fichajes(status) where status in ('open','on_break');
+create index if not exists clock_sessions_org_date_idx on public.clock_sessions(organization_id, work_date);
+create index if not exists clock_sessions_employee_date_idx on public.clock_sessions(employee_id, work_date);
+create index if not exists clock_sessions_status_idx on public.clock_sessions(status) where status in ('open','on_break');
 
 -- =============================================================================
 -- FICHAJE BREAKS (pausas dentro de una jornada)
 -- =============================================================================
 create table if not exists public.fichaje_breaks (
   id uuid primary key default gen_random_uuid(),
-  fichaje_id uuid not null references public.fichajes(id) on delete cascade,
+  fichaje_id uuid not null references public.clock_sessions(id) on delete cascade,
   break_start_at timestamptz not null,
   break_end_at timestamptz,
   duration_minutes integer,
@@ -165,7 +165,7 @@ create index if not exists breaks_fichaje_idx on public.fichaje_breaks(fichaje_i
 -- =============================================================================
 create table if not exists public.fichaje_audit (
   id uuid primary key default gen_random_uuid(),
-  fichaje_id uuid not null references public.fichajes(id) on delete cascade,
+  fichaje_id uuid not null references public.clock_sessions(id) on delete cascade,
   changed_by uuid references public.profiles(id),
   action text not null check (action in ('create','update','delete','auto_close')),
   field text,
@@ -265,7 +265,7 @@ do $$ begin
   create trigger touch_employees before update on public.employees for each row execute procedure public.touch_updated_at();
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create trigger touch_fichajes before update on public.fichajes for each row execute procedure public.touch_updated_at();
+  create trigger touch_clock_sessions before update on public.clock_sessions for each row execute procedure public.touch_updated_at();
 exception when duplicate_object then null; end $$;
 do $$ begin
   create trigger touch_labor_rules before update on public.labor_rules for each row execute procedure public.touch_updated_at();
@@ -279,7 +279,7 @@ alter table public.profiles enable row level security;
 alter table public.locations enable row level security;
 alter table public.employees enable row level security;
 alter table public.labor_rules enable row level security;
-alter table public.fichajes enable row level security;
+alter table public.clock_sessions enable row level security;
 alter table public.fichaje_breaks enable row level security;
 alter table public.fichaje_audit enable row level security;
 
@@ -337,27 +337,27 @@ create policy labor_rules_write on public.labor_rules
 
 -- Fichajes: todos los miembros ven los de su org; solo managers editan los ajenos;
 -- un empleado puede crear/actualizar su propio fichaje (si tiene profile).
-drop policy if exists fichajes_select on public.fichajes;
-create policy fichajes_select on public.fichajes
+drop policy if exists clock_sessions_select on public.clock_sessions;
+create policy clock_sessions_select on public.clock_sessions
   for select using (organization_id = public.current_org_id());
 
-drop policy if exists fichajes_insert on public.fichajes;
-create policy fichajes_insert on public.fichajes
+drop policy if exists clock_sessions_insert on public.clock_sessions;
+create policy clock_sessions_insert on public.clock_sessions
   for insert with check (organization_id = public.current_org_id());
 
-drop policy if exists fichajes_update_manager on public.fichajes;
-create policy fichajes_update_manager on public.fichajes
+drop policy if exists clock_sessions_update_manager on public.clock_sessions;
+create policy clock_sessions_update_manager on public.clock_sessions
   for update using (organization_id = public.current_org_id() and public.is_org_manager());
 
-drop policy if exists fichajes_update_self on public.fichajes;
-create policy fichajes_update_self on public.fichajes
+drop policy if exists clock_sessions_update_self on public.clock_sessions;
+create policy clock_sessions_update_self on public.clock_sessions
   for update using (
     organization_id = public.current_org_id()
     and employee_id in (select id from public.employees where profile_id = auth.uid())
   );
 
-drop policy if exists fichajes_delete_manager on public.fichajes;
-create policy fichajes_delete_manager on public.fichajes
+drop policy if exists clock_sessions_delete_manager on public.clock_sessions;
+create policy clock_sessions_delete_manager on public.clock_sessions
   for delete using (organization_id = public.current_org_id() and public.is_org_manager());
 
 -- Breaks: heredan permisos del fichaje padre
@@ -365,13 +365,13 @@ drop policy if exists breaks_all on public.fichaje_breaks;
 create policy breaks_all on public.fichaje_breaks
   for all using (
     exists (
-      select 1 from public.fichajes f
+      select 1 from public.clock_sessions f
       where f.id = fichaje_id and f.organization_id = public.current_org_id()
     )
   )
   with check (
     exists (
-      select 1 from public.fichajes f
+      select 1 from public.clock_sessions f
       where f.id = fichaje_id and f.organization_id = public.current_org_id()
     )
   );
@@ -381,7 +381,7 @@ drop policy if exists audit_select on public.fichaje_audit;
 create policy audit_select on public.fichaje_audit
   for select using (
     exists (
-      select 1 from public.fichajes f
+      select 1 from public.clock_sessions f
       where f.id = fichaje_id and f.organization_id = public.current_org_id()
     )
   );
@@ -390,7 +390,7 @@ drop policy if exists audit_insert on public.fichaje_audit;
 create policy audit_insert on public.fichaje_audit
   for insert with check (
     exists (
-      select 1 from public.fichajes f
+      select 1 from public.clock_sessions f
       where f.id = fichaje_id and f.organization_id = public.current_org_id()
     )
   );

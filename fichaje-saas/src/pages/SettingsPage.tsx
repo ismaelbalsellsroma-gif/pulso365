@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isDemoMode, DEMO_ORG, DEMO_RULES } from "@/lib/demo";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ const DEFAULT_RULES: Partial<LaborRules> = {
 
 export default function SettingsPage({ profile }: { profile: Profile }) {
   const orgId = profile.organization_id!;
+  const demo = isDemoMode();
   const qc = useQueryClient();
   const [rules, setRules] = useState<Partial<LaborRules>>({});
   const [orgName, setOrgName] = useState("");
@@ -33,6 +35,7 @@ export default function SettingsPage({ profile }: { profile: Profile }) {
   const { data: org } = useQuery({
     queryKey: ["organization", orgId],
     queryFn: async () => {
+      if (demo) return DEMO_ORG;
       const { data, error } = await supabase
         .from("organizations")
         .select("*")
@@ -46,6 +49,7 @@ export default function SettingsPage({ profile }: { profile: Profile }) {
   const { data: existingRules } = useQuery({
     queryKey: ["labor-rules", orgId],
     queryFn: async () => {
+      if (demo) return DEMO_RULES;
       const { data, error } = await supabase
         .from("labor_rules")
         .select("*")

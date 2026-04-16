@@ -2,17 +2,31 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Clock, MapPin, Users, Tablet, Timer } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isDemoMode, DEMO_EMPLOYEES, DEMO_LOCATIONS, getDemoFichajes } from "@/lib/demo";
 import { PageHeader } from "@/components/PageHeader";
 import { formatLongDate, minutesToHours, todayDate } from "@/lib/time";
 import type { Fichaje, Profile } from "@/types";
 
 export default function DashboardPage({ profile }: { profile: Profile }) {
   const orgId = profile.organization_id!;
+  const demo = isDemoMode();
 
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", orgId],
-    refetchInterval: 30_000,
+    refetchInterval: demo ? false : 30_000,
     queryFn: async () => {
+      if (demo) {
+        const fichajes = getDemoFichajes();
+        const totalMin = fichajes.reduce((s, f) => s + (f.worked_minutes ?? 0), 0);
+        return {
+          employees: DEMO_EMPLOYEES.length,
+          locations: DEMO_LOCATIONS.length,
+          todayFichajes: fichajes.length,
+          totalMin,
+          working: fichajes.filter(f => f.status === "open").length,
+          onBreak: fichajes.filter(f => f.status === "on_break").length,
+        };
+      }
       const [empRes, locRes, fRes] = await Promise.all([
         supabase
           .from("employees")
@@ -25,7 +39,7 @@ export default function DashboardPage({ profile }: { profile: Profile }) {
           .eq("organization_id", orgId)
           .eq("active", true),
         supabase
-          .from("fichajes")
+          .from("clock_sessions")
           .select("*")
           .eq("organization_id", orgId)
           .eq("work_date", todayDate()),

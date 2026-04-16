@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { isDemoMode, DEMO_EMPLOYEES, getDemoFichajes } from "@/lib/demo";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,7 @@ const stateMeta: Record<
 
 export default function FichajePage({ profile }: Props) {
   const orgId = profile.organization_id!;
+  const demo = isDemoMode();
   const [tick, setTick] = useState(Date.now());
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export default function FichajePage({ profile }: Props) {
   const { data: employees = [] } = useQuery({
     queryKey: ["employees", orgId],
     queryFn: async () => {
+      if (demo) return DEMO_EMPLOYEES;
       const { data, error } = await supabase
         .from("employees")
         .select("*")
@@ -56,10 +59,11 @@ export default function FichajePage({ profile }: Props) {
 
   const { data: todayFichajes = [] } = useQuery({
     queryKey: ["fichajes", orgId, todayDate()],
-    refetchInterval: 15_000,
+    refetchInterval: demo ? false : 15_000,
     queryFn: async () => {
+      if (demo) return getDemoFichajes();
       const { data, error } = await supabase
-        .from("fichajes")
+        .from("clock_sessions")
         .select("*")
         .eq("organization_id", orgId)
         .eq("work_date", todayDate());

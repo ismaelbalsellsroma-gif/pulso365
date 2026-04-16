@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { disableDemoMode, isDemoMode } from "@/lib/demo";
 import { toast } from "sonner";
 
 interface NavItem {
@@ -36,6 +37,12 @@ export default function Layout({ profile }: { profile: Profile }) {
   const visible = NAV.filter((n) => !n.roles || n.roles.includes(role));
 
   async function logout() {
+    if (isDemoMode()) {
+      disableDemoMode();
+      toast.success("Demo desactivado");
+      window.location.href = "/";
+      return;
+    }
     await supabase.auth.signOut();
     toast.success("Sesión cerrada");
     navigate("/auth", { replace: true });
