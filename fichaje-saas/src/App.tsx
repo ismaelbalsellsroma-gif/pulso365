@@ -1,22 +1,24 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import Layout from "@/components/Layout";
-import LandingPage from "@/pages/LandingPage";
-import AuthPage from "@/pages/AuthPage";
-import DashboardPage from "@/pages/DashboardPage";
-import MyClockPage from "@/pages/MyClockPage";
-import FichajePage from "@/pages/FichajePage";
-import EmployeesPage from "@/pages/EmployeesPage";
-import LocationsPage from "@/pages/LocationsPage";
-import SettingsPage from "@/pages/SettingsPage";
-import CuadrantePage from "@/pages/CuadrantePage";
-import CuadranteIAPage from "@/pages/CuadranteIAPage";
-import AusenciasPage from "@/pages/AusenciasPage";
-import ReportesPage from "@/pages/ReportesPage";
-import NominaPage from "@/pages/NominaPage";
-import ShiftSwapPage from "@/pages/ShiftSwapPage";
-import KioskPage from "@/pages/KioskPage";
-import NotFoundPage from "@/pages/NotFoundPage";
+import { useAuth } from "@/shared/hooks/useAuth";
+import Layout from "@/shared/components/Layout";
+
+// Modules
+import LandingPage from "@/modules/auth/LandingPage";
+import AuthPage from "@/modules/auth/AuthPage";
+import DashboardPage from "@/modules/dashboard/DashboardPage";
+import MyClockPage from "@/modules/clock/MyClockPage";
+import FichajePage from "@/modules/clock/FichajePage";
+import KioskPage from "@/modules/clock/KioskPage";
+import CuadrantePage from "@/modules/schedule/CuadrantePage";
+import CuadranteIAPage from "@/modules/schedule/CuadranteIAPage";
+import AusenciasPage from "@/modules/absences/AusenciasPage";
+import ShiftSwapPage from "@/modules/swaps/ShiftSwapPage";
+import ReportesPage from "@/modules/reports/ReportesPage";
+import NominaPage from "@/modules/payroll/NominaPage";
+import EmployeesPage from "@/modules/employees/EmployeesPage";
+import LocationsPage from "@/modules/locations/LocationsPage";
+import SettingsPage from "@/modules/settings/SettingsPage";
+import NotFoundPage from "@/shared/components/NotFoundPage";
 
 function Spinner() {
   return (
@@ -33,15 +35,12 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Public */}
       <Route path="/" element={<LandingPage />} />
-      <Route
-        path="/auth"
-        element={session ? <Navigate to="/app" replace /> : <AuthPage />}
-      />
+      <Route path="/auth" element={session ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/kiosco" element={<KioskPage />} />
 
-      {/* Protected routes */}
+      {/* Protected */}
       {session && profile ? (
         <Route path="/app" element={<Layout profile={profile} />}>
           <Route index element={<DashboardPage profile={profile} />} />
@@ -50,9 +49,9 @@ export default function App() {
           <Route path="cuadrante" element={<CuadrantePage profile={profile} />} />
           <Route path="cuadrante-ia" element={<CuadranteIAPage profile={profile} />} />
           <Route path="ausencias" element={<AusenciasPage profile={profile} />} />
+          <Route path="swaps" element={<ShiftSwapPage profile={profile} />} />
           <Route path="reportes" element={<ReportesPage profile={profile} />} />
           <Route path="nomina" element={<NominaPage profile={profile} />} />
-          <Route path="swaps" element={<ShiftSwapPage profile={profile} />} />
           <Route path="empleados" element={<EmployeesPage profile={profile} />} />
           <Route path="locales" element={<LocationsPage profile={profile} />} />
           <Route path="ajustes" element={<SettingsPage profile={profile} />} />
