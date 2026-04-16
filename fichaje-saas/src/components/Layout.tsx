@@ -1,11 +1,13 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  CalendarDays,
   Clock,
   LayoutDashboard,
   Users,
   MapPin,
   Settings,
   LogOut,
+  Sparkles,
   Tablet,
   Timer,
 } from "lucide-react";
@@ -26,6 +28,8 @@ const NAV: NavItem[] = [
   { to: "/app", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/my-clock", icon: Timer, label: "Mi fichaje" },
   { to: "/app/fichaje", icon: Clock, label: "Fichajes en vivo", roles: ["admin", "manager"] },
+  { to: "/app/cuadrante", icon: CalendarDays, label: "Cuadrante", roles: ["admin", "manager"] },
+  { to: "/app/cuadrante-ia", icon: Sparkles, label: "Generar con IA", roles: ["admin", "manager"] },
   { to: "/app/empleados", icon: Users, label: "Empleados", roles: ["admin", "manager"] },
   { to: "/app/locales", icon: MapPin, label: "Locales", roles: ["admin", "manager"] },
   { to: "/app/ajustes", icon: Settings, label: "Ajustes", roles: ["admin"] },

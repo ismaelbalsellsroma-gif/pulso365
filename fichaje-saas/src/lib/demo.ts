@@ -1,4 +1,9 @@
-import type { Employee, Fichaje, FichajeBreak, LaborRules, Location, Organization, Profile } from "@/types";
+import type {
+  DemandForecast, Employee, EmployeeAvailability, Fichaje, FichajeBreak,
+  LaborRules, Location, Organization, Profile, ShiftPlan, ShiftPlanItem,
+  ShiftTemplate, StaffingRule,
+} from "@/types";
+import { format, addDays, startOfWeek } from "date-fns";
 
 // IDs estáticos para relaciones consistentes
 const ORG_ID = "demo-org-001";
@@ -205,6 +210,107 @@ export function getDemoBreaks(): FichajeBreak[] {
       duration_minutes: null, break_type: "pause",
       created_at: minsAgo(15),
     },
+  ];
+}
+
+// ===== F3+F4: Turnos, cuadrantes, IA =====
+
+export const DEMO_SHIFT_TEMPLATES: ShiftTemplate[] = [
+  { id: "tpl-1", organization_id: ORG_ID, name: "Mañana", start_time: "08:00", end_time: "16:00", break_minutes: 30, color: "#3B82F6", roles: ["camarero","cocinero"], active: true, created_at: "", updated_at: "" },
+  { id: "tpl-2", organization_id: ORG_ID, name: "Tarde", start_time: "16:00", end_time: "00:00", break_minutes: 30, color: "#F97316", roles: ["camarero","cocinero"], active: true, created_at: "", updated_at: "" },
+  { id: "tpl-3", organization_id: ORG_ID, name: "Partido", start_time: "10:00", end_time: "16:00", break_minutes: 0, color: "#10B981", roles: [], active: true, created_at: "", updated_at: "" },
+  { id: "tpl-4", organization_id: ORG_ID, name: "Turno completo", start_time: "09:00", end_time: "17:00", break_minutes: 30, color: "#8B5CF6", roles: ["encargado"], active: true, created_at: "", updated_at: "" },
+];
+
+export function getDemoShiftPlan(weekStart: string): ShiftPlan {
+  return {
+    id: "plan-demo-001",
+    organization_id: ORG_ID,
+    location_id: LOC_1,
+    week_start: weekStart,
+    status: "draft",
+    generated_by: "ai",
+    ai_explanation: "He generado un cuadrante de ejemplo con **12 turnos** para **5 empleados**. La cobertura es del **85%** con 2 turnos abiertos que necesitan cubrirse.",
+    ai_suggestions: [
+      { action: "assign_underused", description: "Pablo tiene pocas horas. Podría cubrir el turno abierto del sábado.", impact: "high" },
+      { action: "balance_hours", description: "Ana tiene 8h más que Carlos. Redistribuir un turno mejoraría la equidad.", impact: "medium" },
+    ],
+    total_hours: 80,
+    total_cost: 1040,
+    coverage_score: 85,
+    notes: null,
+    published_at: null,
+    published_by: null,
+    created_at: "",
+    updated_at: "",
+  };
+}
+
+export function getDemoShiftItems(): ShiftPlanItem[] {
+  const monday = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const d = (i: number) => format(addDays(monday, i), "yyyy-MM-dd");
+
+  return [
+    { id: "si-01", plan_id: "plan-demo-001", employee_id: "emp-001", work_date: d(0), start_time: "08:00", end_time: "16:00", break_minutes: 30, role: "camarero", color: "#3B82F6", notes: null, is_open_shift: false, sort_order: 0, created_at: "", updated_at: "" },
+    { id: "si-02", plan_id: "plan-demo-001", employee_id: "emp-001", work_date: d(2), start_time: "08:00", end_time: "16:00", break_minutes: 30, role: "camarero", color: "#3B82F6", notes: null, is_open_shift: false, sort_order: 1, created_at: "", updated_at: "" },
+    { id: "si-03", plan_id: "plan-demo-001", employee_id: "emp-001", work_date: d(4), start_time: "08:00", end_time: "16:00", break_minutes: 30, role: "camarero", color: "#3B82F6", notes: null, is_open_shift: false, sort_order: 2, created_at: "", updated_at: "" },
+    { id: "si-04", plan_id: "plan-demo-001", employee_id: "emp-002", work_date: d(0), start_time: "08:00", end_time: "16:00", break_minutes: 30, role: "cocinero", color: "#F97316", notes: null, is_open_shift: false, sort_order: 3, created_at: "", updated_at: "" },
+    { id: "si-05", plan_id: "plan-demo-001", employee_id: "emp-002", work_date: d(1), start_time: "08:00", end_time: "16:00", break_minutes: 30, role: "cocinero", color: "#F97316", notes: null, is_open_shift: false, sort_order: 4, created_at: "", updated_at: "" },
+    { id: "si-06", plan_id: "plan-demo-001", employee_id: "emp-002", work_date: d(3), start_time: "16:00", end_time: "00:00", break_minutes: 30, role: "cocinero", color: "#F97316", notes: null, is_open_shift: false, sort_order: 5, created_at: "", updated_at: "" },
+    { id: "si-07", plan_id: "plan-demo-001", employee_id: "emp-004", work_date: d(0), start_time: "09:00", end_time: "17:00", break_minutes: 30, role: "encargado", color: "#8B5CF6", notes: null, is_open_shift: false, sort_order: 6, created_at: "", updated_at: "" },
+    { id: "si-08", plan_id: "plan-demo-001", employee_id: "emp-004", work_date: d(1), start_time: "09:00", end_time: "17:00", break_minutes: 30, role: "encargado", color: "#8B5CF6", notes: null, is_open_shift: false, sort_order: 7, created_at: "", updated_at: "" },
+    { id: "si-09", plan_id: "plan-demo-001", employee_id: "emp-004", work_date: d(2), start_time: "09:00", end_time: "17:00", break_minutes: 30, role: "encargado", color: "#8B5CF6", notes: null, is_open_shift: false, sort_order: 8, created_at: "", updated_at: "" },
+    { id: "si-10", plan_id: "plan-demo-001", employee_id: "emp-003", work_date: d(1), start_time: "16:00", end_time: "00:00", break_minutes: 30, role: "camarero", color: "#10B981", notes: null, is_open_shift: false, sort_order: 9, created_at: "", updated_at: "" },
+    { id: "si-11", plan_id: "plan-demo-001", employee_id: "emp-003", work_date: d(3), start_time: "16:00", end_time: "00:00", break_minutes: 30, role: "camarero", color: "#10B981", notes: null, is_open_shift: false, sort_order: 10, created_at: "", updated_at: "" },
+    { id: "si-12", plan_id: "plan-demo-001", employee_id: "emp-005", work_date: d(5), start_time: "10:00", end_time: "16:00", break_minutes: 0, role: "camarero", color: "#EF4444", notes: null, is_open_shift: false, sort_order: 11, created_at: "", updated_at: "" },
+  ];
+}
+
+export function getDemoDemand(weekStart: string): DemandForecast[] {
+  const monday = new Date(weekStart + "T00:00:00");
+  const result: DemandForecast[] = [];
+  const slots = ["10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"];
+  const baseCurve = [10,20,40,65,55,30,25,30,45,60,70,50,25];
+  const dayFactor = [1.0, 0.8, 0.9, 1.0, 1.2, 1.5, 1.3]; // lun-dom
+
+  for (let d = 0; d < 7; d++) {
+    const dateStr = format(addDays(monday, d), "yyyy-MM-dd");
+    slots.forEach((slot, si) => {
+      result.push({
+        id: `dem-${d}-${si}`,
+        organization_id: ORG_ID,
+        location_id: LOC_1,
+        forecast_date: dateStr,
+        time_slot: slot,
+        expected_covers: Math.round(baseCurve[si] * dayFactor[d]),
+        expected_revenue: Math.round(baseCurve[si] * dayFactor[d] * 18),
+        source: "historical",
+        confidence: 75,
+      });
+    });
+  }
+  return result;
+}
+
+export function getDemoStaffingRules(): StaffingRule[] {
+  return [
+    { id: "sr-1", organization_id: ORG_ID, role: "camarero", covers_per_staff: 25, min_staff: 1, required_always: false },
+    { id: "sr-2", organization_id: ORG_ID, role: "cocinero", covers_per_staff: 35, min_staff: 1, required_always: false },
+    { id: "sr-3", organization_id: ORG_ID, role: "encargado", covers_per_staff: 999, min_staff: 1, required_always: true },
+  ];
+}
+
+export function getDemoAvailability(): EmployeeAvailability[] {
+  // Pablo no disponible martes y miércoles
+  return [
+    { id: "av-1", employee_id: "emp-003", day_of_week: 1, available: false, preferred_start: null, preferred_end: null, notes: "universidad" },
+    { id: "av-2", employee_id: "emp-003", day_of_week: 2, available: false, preferred_start: null, preferred_end: null, notes: "universidad" },
+    // Javier solo puede tardes
+    { id: "av-3", employee_id: "emp-005", day_of_week: 0, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
+    { id: "av-4", employee_id: "emp-005", day_of_week: 1, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
+    { id: "av-5", employee_id: "emp-005", day_of_week: 2, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
+    { id: "av-6", employee_id: "emp-005", day_of_week: 3, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
+    { id: "av-7", employee_id: "emp-005", day_of_week: 4, available: true, preferred_start: "16:00", preferred_end: "00:00", notes: null },
   ];
 }
 

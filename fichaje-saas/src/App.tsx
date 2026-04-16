@@ -9,6 +9,8 @@ import FichajePage from "@/pages/FichajePage";
 import EmployeesPage from "@/pages/EmployeesPage";
 import LocationsPage from "@/pages/LocationsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import CuadrantePage from "@/pages/CuadrantePage";
+import CuadranteIAPage from "@/pages/CuadranteIAPage";
 import KioskPage from "@/pages/KioskPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -41,6 +43,8 @@ export default function App() {
           <Route index element={<DashboardPage profile={profile} />} />
           <Route path="my-clock" element={<MyClockPage profile={profile} />} />
           <Route path="fichaje" element={<FichajePage profile={profile} />} />
+          <Route path="cuadrante" element={<CuadrantePage profile={profile} />} />
+          <Route path="cuadrante-ia" element={<CuadranteIAPage profile={profile} />} />
           <Route path="empleados" element={<EmployeesPage profile={profile} />} />
           <Route path="locales" element={<LocationsPage profile={profile} />} />
           <Route path="ajustes" element={<SettingsPage profile={profile} />} />
