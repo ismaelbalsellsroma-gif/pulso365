@@ -1,9 +1,11 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  ArrowLeftRight,
   BarChart3,
   CalendarDays,
   CalendarOff,
   Clock,
+  Euro,
   LayoutDashboard,
   Users,
   MapPin,
@@ -17,6 +19,7 @@ import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { disableDemoMode, isDemoMode } from "@/lib/demo";
+import NotificationBell from "@/components/NotificationBell";
 import { toast } from "sonner";
 
 interface NavItem {
@@ -32,8 +35,10 @@ const NAV: NavItem[] = [
   { to: "/app/fichaje", icon: Clock, label: "Fichajes en vivo", roles: ["admin", "manager"] },
   { to: "/app/cuadrante", icon: CalendarDays, label: "Cuadrante", roles: ["admin", "manager"] },
   { to: "/app/cuadrante-ia", icon: Sparkles, label: "Generar con IA", roles: ["admin", "manager"] },
-  { to: "/app/ausencias", icon: CalendarOff, label: "Ausencias", roles: ["admin", "manager"] },
+  { to: "/app/ausencias", icon: CalendarOff, label: "Ausencias" },
+  { to: "/app/swaps", icon: ArrowLeftRight, label: "Intercambios", roles: ["admin", "manager"] },
   { to: "/app/reportes", icon: BarChart3, label: "Reportes", roles: ["admin", "manager"] },
+  { to: "/app/nomina", icon: Euro, label: "Nómina", roles: ["admin", "manager"] },
   { to: "/app/empleados", icon: Users, label: "Empleados", roles: ["admin", "manager"] },
   { to: "/app/locales", icon: MapPin, label: "Locales", roles: ["admin", "manager"] },
   { to: "/app/ajustes", icon: Settings, label: "Ajustes", roles: ["admin"] },
@@ -104,13 +109,16 @@ export default function Layout({ profile }: { profile: Profile }) {
         </nav>
 
         <div className="p-3 border-t border-slate-200">
-          <div className="px-2 py-2">
-            <div className="text-sm font-semibold text-slate-900 truncate">
-              {profile.full_name ?? profile.email}
+          <div className="px-2 py-2 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 truncate">
+                {profile.full_name ?? profile.email}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                {role}
+              </div>
             </div>
-            <div className="text-[10px] uppercase tracking-wider text-slate-500">
-              {role}
-            </div>
+            <NotificationBell profile={profile} />
           </div>
           <button
             onClick={logout}
@@ -131,12 +139,15 @@ export default function Layout({ profile }: { profile: Profile }) {
             </div>
             <span className="font-bold text-slate-900">Fichaje</span>
           </div>
-          <button
-            onClick={logout}
-            className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell profile={profile} />
+            <button
+              onClick={logout}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full">

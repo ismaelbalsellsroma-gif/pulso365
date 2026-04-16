@@ -315,6 +315,15 @@ export function getDemoAvailability(): EmployeeAvailability[] {
   ];
 }
 
+// ===== F5+: Shift swaps =====
+
+export function getDemoSwapRequests(): import("@/types").ShiftSwapRequest[] {
+  return [
+    { id: "sw-1", organization_id: ORG_ID, requester_id: "emp-003", target_id: "emp-001", requester_item_id: "si-10", target_item_id: "si-01", status: "pending", reason: "Tengo cita médica el martes, ¿me cambias al lunes?", decided_by: null, decided_at: null, created_at: minsAgo(120) },
+    { id: "sw-2", organization_id: ORG_ID, requester_id: "emp-005", target_id: "emp-003", requester_item_id: "si-12", target_item_id: "si-11", status: "accepted", reason: "Prefiero trabajar el jueves", decided_by: ADMIN_PROFILE_ID, decided_at: hoursAgo(24), created_at: hoursAgo(48) },
+  ];
+}
+
 // ===== F5: Ausencias, reportes, notificaciones =====
 
 export function getDemoAbsenceTypes(): AbsenceType[] {
