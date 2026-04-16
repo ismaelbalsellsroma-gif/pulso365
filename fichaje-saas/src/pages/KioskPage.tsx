@@ -12,6 +12,7 @@ import {
   Tablet,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isDemoMode, DEMO_EMPLOYEES, DEMO_LOCATIONS, DEMO_RULES, DEMO_ORG, getDemoFichajes, getDemoBreaks } from "@/lib/demo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import CameraCapture from "@/components/CameraCapture";
@@ -138,11 +139,20 @@ export default function KioskPage() {
     return () => clearInterval(i);
   }, []);
 
-  // Resolver orgId / location / rules a partir del slug (requiere sesión kiosco)
+  const demo = isDemoMode();
+
+  // Resolver orgId / location / rules a partir del slug
   useEffect(() => {
     async function resolve() {
       if (!orgSlug) return;
       localStorage.setItem("fichaje_kiosk_org", orgSlug);
+
+      if (demo) {
+        setOrgId(DEMO_ORG.id);
+        setLocation(DEMO_LOCATIONS[0]);
+        setRules(DEMO_RULES);
+        return;
+      }
 
       const { data: org } = await supabase
         .from("organizations")
@@ -173,7 +183,7 @@ export default function KioskPage() {
       setRules((lr as LaborRules | null) ?? null);
     }
     resolve();
-  }, [orgSlug, locationId]);
+  }, [orgSlug, locationId, demo]);
 
   // Reloj grande
   const clockHHMM = new Date(tick).toLocaleTimeString("es-ES", {
@@ -189,47 +199,43 @@ export default function KioskPage() {
     }
     setLoading(true);
     try {
-      const { data: emp, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("organization_id", orgId)
-        .eq("pin", pin)
-        .eq("active", true)
-        .maybeSingle();
-      if (error) throw error;
-      if (!emp) {
-        toast.error("PIN inválido");
-        setPin("");
-        return;
-      }
-
-      const { data: open } = await supabase
-        .from("clock_sessions")
-        .select("*")
-        .eq("employee_id", emp.id)
-        .in("status", ["open", "on_break"])
-        .order("clock_in_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
+      let emp: Employee | null = null;
+      let openFichaje: Fichaje | null = null;
       let openBreak: FichajeBreak | null = null;
-      if (open?.status === "on_break") {
-        const { data: br } = await supabase
-          .from("fichaje_breaks")
-          .select("*")
-          .eq("fichaje_id", open.id)
-          .is("break_end_at", null)
-          .order("break_start_at", { ascending: false })
-          .maybeSingle();
-        openBreak = (br as FichajeBreak | null) ?? null;
+
+      if (demo) {
+        emp = DEMO_EMPLOYEES.find((e) => e.pin === pin && e.active) ?? null;
+        if (!emp) { toast.error("PIN inválido"); setPin(""); setLoading(false); return; }
+        const fichajes = getDemoFichajes();
+        openFichaje = fichajes.find((f) => f.employee_id === emp!.id && (f.status === "open" || f.status === "on_break")) ?? null;
+        if (openFichaje?.status === "on_break") {
+          const breaks = getDemoBreaks();
+          openBreak = breaks.find((b) => b.fichaje_id === openFichaje!.id && !b.break_end_at) ?? null;
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("employees").select("*")
+          .eq("organization_id", orgId).eq("pin", pin).eq("active", true).maybeSingle();
+        if (error) throw error;
+        if (!data) { toast.error("PIN inválido"); setPin(""); setLoading(false); return; }
+        emp = data as Employee;
+
+        const { data: open } = await supabase
+          .from("clock_sessions").select("*")
+          .eq("employee_id", emp.id).in("status", ["open", "on_break"])
+          .order("clock_in_at", { ascending: false }).limit(1).maybeSingle();
+        openFichaje = (open as Fichaje | null) ?? null;
+
+        if (openFichaje?.status === "on_break") {
+          const { data: br } = await supabase
+            .from("fichaje_breaks").select("*")
+            .eq("fichaje_id", openFichaje.id).is("break_end_at", null)
+            .order("break_start_at", { ascending: false }).maybeSingle();
+          openBreak = (br as FichajeBreak | null) ?? null;
+        }
       }
 
-      setView({
-        step: "employee",
-        employee: emp as Employee,
-        openFichaje: (open as Fichaje | null) ?? null,
-        openBreak,
-      });
+      setView({ step: "employee", employee: emp!, openFichaje, openBreak });
       setPin("");
     } catch (e: any) {
       toast.error(e?.message ?? "Error al validar PIN");
@@ -246,6 +252,11 @@ export default function KioskPage() {
   // Acciones de fichaje desde kiosco
   async function doClockIn(photoUrl: string | null) {
     if (view.step !== "employee" || !orgId) return;
+    if (demo) {
+      toast.success(`¡Entrada registrada, ${view.employee.first_name}!`);
+      setTimeout(backToPin, 1500);
+      return;
+    }
     const coords = await getCurrentPosition();
     const check = coords && location ? checkGeofence(coords, location) : null;
     if (rules?.require_geofence && check && !check.withinFence) {
@@ -278,6 +289,11 @@ export default function KioskPage() {
 
   async function doClockOut(photoUrl: string | null) {
     if (view.step !== "employee" || !view.openFichaje) return;
+    if (demo) {
+      toast.success(`¡Hasta luego, ${view.employee.first_name}!`);
+      setTimeout(backToPin, 1500);
+      return;
+    }
     const coords = await getCurrentPosition();
     const now = new Date().toISOString();
     const worked = computeWorkedMinutes(
@@ -307,6 +323,7 @@ export default function KioskPage() {
 
   async function doStartBreak() {
     if (view.step !== "employee" || !view.openFichaje) return;
+    if (demo) { toast.success("Pausa iniciada"); setTimeout(backToPin, 1000); return; }
     const { error } = await supabase.from("fichaje_breaks").insert({
       fichaje_id: view.openFichaje.id,
       break_start_at: new Date().toISOString(),
@@ -323,6 +340,7 @@ export default function KioskPage() {
 
   async function doEndBreak() {
     if (view.step !== "employee" || !view.openFichaje || !view.openBreak) return;
+    if (demo) { toast.success("Pausa finalizada"); setTimeout(backToPin, 1000); return; }
     const now = new Date().toISOString();
     const dur = Math.round(
       (new Date(now).getTime() - new Date(view.openBreak.break_start_at).getTime()) /
@@ -367,6 +385,11 @@ export default function KioskPage() {
   }
 
   // Si no hay orgSlug, pedimos configuración
+  // En demo, auto-configurar sin pedir slug
+  if (!orgSlug && demo) {
+    setOrgSlug(DEMO_ORG.slug);
+  }
+
   if (!orgSlug) {
     return <KioskSetup onSaved={(slug, loc) => {
       setOrgSlug(slug);
