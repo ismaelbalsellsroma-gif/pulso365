@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Procesador de Albaranes{% endblock %}
+{% block content %}
+<section class="mb-8">
+  <h1 class="text-4xl font-bold mb-2">Procesador de Albaranes</h1>
+  <p class="text-slate-600">
+    Arrastra tus albaranes y deja que Claude Opus 4.7 extraiga los datos.
+  </p>
+  {% if erp_insecure %}
+    <div class="mt-3 rounded border border-amber-300 bg-amber-50 text-amber-900 px-4 py-2 text-sm">
+      ⚠ ERP_WEBHOOK_URL usa HTTP sin cifrar. Considera usar HTTPS.
+    </div>
+  {% endif %}
+</section>
+
+<form id="upload-form" enctype="multipart/form-data">
+  <div id="drop-zone"
+       class="border-4 border-dashed border-slate-300 rounded-2xl bg-white
+              flex flex-col items-center justify-center text-center p-12
+              transition-colors cursor-pointer"
+       style="min-height: 400px;">
+    <div class="text-6xl mb-4">📤</div>
+    <p class="text-xl font-semibold text-slate-700 mb-1">
+      Arrastra aquí tus albaranes
+    </p>
+    <p class="text-slate-500 mb-4">
+      PDF, JPG, PNG · Máximo 20 archivos · 10 MB por archivo
+    </p>
+    <p class="text-sm text-slate-400">O haz clic para seleccionarlos</p>
+    <input id="file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.gif" class="hidden" />
+  </div>
+
+  <div id="file-list" class="mt-6 space-y-2"></div>
+
+  <div class="mt-6 flex items-center justify-between">
+    <div id="counter" class="text-slate-600">📄 0 archivos cargados</div>
+    <button id="process-btn" type="button"
+            class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed
+                   text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+            disabled>
+      Procesar
+    </button>
+  </div>
+
+  <div id="progress" class="hidden mt-6">
+    <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+      <div id="progress-bar" class="bg-blue-600 h-3 transition-all" style="width: 0%;"></div>
+    </div>
+    <div id="progress-text" class="text-sm text-slate-600 mt-2">Preparando…</div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/upload.js"></script>
+{% endblock %}

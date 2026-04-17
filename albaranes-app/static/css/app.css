@@ -1,0 +1,23 @@
+/* Highlight fields flagged as uncertain by Claude */
+.campo-dudoso {
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+}
+.campo-dudoso:focus {
+  background-color: #fffbeb !important;
+}
+
+.campo-error {
+  background-color: #fee2e2 !important;
+  border-color: #ef4444 !important;
+}
+
+#drop-zone.drag-over {
+  background-color: #dbeafe;
+  border-color: #2563eb;
+}
+
+/* Nicer number inputs */
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}

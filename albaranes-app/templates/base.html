@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Procesador de Albaranes{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold tracking-tight">📦 Procesador de Albaranes</a>
+      <nav class="text-sm text-slate-600 space-x-4">
+        <a href="/" class="hover:text-slate-900">Inicio</a>
+        <a href="/historico" class="hover:text-slate-900">Histórico</a>
+      </nav>
+    </div>
+  </header>
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

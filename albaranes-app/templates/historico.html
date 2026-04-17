@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Histórico{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-4">Histórico</h1>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white border rounded p-4">
+    <div class="text-xs text-slate-500">Procesados</div>
+    <div class="text-2xl font-bold">{{ stats.n or 0 }}</div>
+  </div>
+  <div class="bg-white border rounded p-4">
+    <div class="text-xs text-slate-500">Revisados</div>
+    <div class="text-2xl font-bold">{{ stats.revisados or 0 }}</div>
+  </div>
+  <div class="bg-white border rounded p-4">
+    <div class="text-xs text-slate-500">Coste total</div>
+    <div class="text-2xl font-bold">{{ '%.4f' % (stats.coste or 0) }} €</div>
+  </div>
+  <div class="bg-white border rounded p-4">
+    <div class="text-xs text-slate-500">Tokens</div>
+    <div class="text-sm">in: {{ stats.in_tok or 0 }} / out: {{ stats.out_tok or 0 }}</div>
+  </div>
+</div>
+
+<div class="bg-white rounded-lg border overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-100 text-slate-700 text-left">
+      <tr>
+        <th class="px-3 py-2">Fecha</th>
+        <th class="px-3 py-2">Archivo</th>
+        <th class="px-3 py-2">Proveedor</th>
+        <th class="px-3 py-2">Nº</th>
+        <th class="px-3 py-2">Fecha alb.</th>
+        <th class="px-3 py-2 text-right">Total</th>
+        <th class="px-3 py-2">Confianza</th>
+        <th class="px-3 py-2 text-right">Coste</th>
+        <th class="px-3 py-2">Revisado</th>
+        <th class="px-3 py-2">ERP</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200">
+      {% for r in rows %}
+        <tr>
+          <td class="px-3 py-2 text-xs">{{ r.fecha_procesamiento }}</td>
+          <td class="px-3 py-2 truncate max-w-[180px]" title="{{ r.nombre_archivo }}">{{ r.nombre_archivo }}</td>
+          <td class="px-3 py-2">{{ r.proveedor_nombre or '—' }}</td>
+          <td class="px-3 py-2">{{ r.albaran_numero or '—' }}</td>
+          <td class="px-3 py-2">{{ r.albaran_fecha or '' }}</td>
+          <td class="px-3 py-2 text-right">{{ '%.2f' % (r.total_eur or 0) }}</td>
+          <td class="px-3 py-2">{{ r.confianza or '—' }}</td>
+          <td class="px-3 py-2 text-right">{{ '%.4f' % (r.coste_eur or 0) }}</td>
+          <td class="px-3 py-2">{{ 'sí' if r.requirio_revision else '—' }}</td>
+          <td class="px-3 py-2">{{ 'sí' if r.enviado_erp else '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="px-3 py-6 text-center text-slate-400">Nada aún.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

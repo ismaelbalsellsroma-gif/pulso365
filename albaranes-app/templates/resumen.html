@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Resumen final{% endblock %}
+{% block content %}
+<section class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-3xl font-bold">Resumen final</h1>
+    <p class="text-slate-600">
+      {{ metadata.total_albaranes }} albaranes ·
+      {{ metadata.procesados_automaticamente }} auto ·
+      {{ metadata.corregidos_manualmente }} corregidos ·
+      <strong>{{ '%.4f' % metadata.coste_api_eur }} €</strong>
+    </p>
+  </div>
+  <div class="space-x-2">
+    <a href="/api/export/{{ session_id }}"
+       class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">
+      ⬇ Descargar JSON
+    </a>
+    {% if erp_configured %}
+      <button id="send-erp" type="button"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded">
+        📤 Enviar al ERP
+      </button>
+    {% endif %}
+  </div>
+</section>
+
+<div class="bg-white rounded-lg border overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-100 text-slate-700 text-left">
+      <tr>
+        <th class="px-3 py-2">Nº</th>
+        <th class="px-3 py-2">Fecha</th>
+        <th class="px-3 py-2">Proveedor</th>
+        <th class="px-3 py-2">CIF</th>
+        <th class="px-3 py-2 text-right">Base</th>
+        <th class="px-3 py-2 text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200">
+      {% for a in albaranes %}
+        <tr>
+          <td class="px-3 py-2">{{ (a.albaran.numero if a.albaran else '—') or '—' }}</td>
+          <td class="px-3 py-2">{{ (a.albaran.fecha if a.albaran else '') or '' }}</td>
+          <td class="px-3 py-2">{{ (a.proveedor.nombre if a.proveedor else '—') or '—' }}</td>
+          <td class="px-3 py-2 font-mono text-xs">{{ (a.proveedor.cif_nif if a.proveedor else '—') or '—' }}</td>
+          <td class="px-3 py-2 text-right">{{ '%.2f' % ((a.totales.base_imponible if a.totales else 0) or 0) }}</td>
+          <td class="px-3 py-2 text-right font-semibold">{{ '%.2f' % ((a.totales.total if a.totales else 0) or 0) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="px-3 py-6 text-center text-slate-400">Sin albaranes confirmados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div id="erp-result" class="mt-4 text-sm"></div>
+
+<script>
+const sendBtn = document.getElementById("send-erp");
+if (sendBtn) {
+  sendBtn.addEventListener("click", async () => {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Enviando…";
+    const res = await fetch("/api/enviar-erp/{{ session_id }}", { method: "POST" });
+    const out = document.getElementById("erp-result");
+    if (res.ok) {
+      const data = await res.json();
+      out.className = "mt-4 text-sm text-emerald-700";
+      out.textContent = "Enviado correctamente. Estado: " + data.erp_response.status;
+    } else {
+      const err = await res.text();
+      out.className = "mt-4 text-sm text-rose-700";
+      out.textContent = "Error: " + err;
+    }
+    sendBtn.disabled = false;
+    sendBtn.textContent = "📤 Enviar al ERP";
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Resultados — Procesador de Albaranes{% endblock %}
+{% block content %}
+<section class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-3xl font-bold">Resultados</h1>
+    <p class="text-slate-600">Coste estimado de esta tanda: <strong>{{ '%.4f' % coste_eur }} €</strong></p>
+  </div>
+  <div class="space-x-2">
+    <a href="/" class="inline-block bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded">Volver</a>
+    {% if revisar|length == 0 %}
+      <a href="/resumen/{{ session_id }}" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">
+        Ir al resumen
+      </a>
+    {% endif %}
+  </div>
+</section>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="bg-white rounded-lg border border-emerald-300 overflow-hidden">
+    <div class="bg-emerald-500 text-white px-4 py-3 font-bold">
+      ✅ Listos ({{ listos|length }})
+    </div>
+    <ul class="divide-y divide-slate-200">
+      {% for item in listos %}
+        <li class="p-4 text-sm">
+          <div class="font-semibold">
+            {{ (item.data.albaran.numero if item.data.albaran else '—') or '—' }}
+            · {{ (item.data.albaran.fecha if item.data.albaran else '') or '' }}
+          </div>
+          <div class="text-slate-500">
+            {{ (item.data.proveedor.nombre if item.data.proveedor else '—') or '—' }}
+          </div>
+          <div class="text-slate-700 mt-1">
+            Total: <strong>{{ '%.2f' % ((item.data.totales.total if item.data.totales else 0) or 0) }} €</strong>
+          </div>
+          <button class="mt-2 text-blue-600 hover:underline"
+                  onclick='showJson({{ (item.data or {}) | tojson | safe }})'>Ver JSON</button>
+        </li>
+      {% else %}
+        <li class="p-4 text-slate-400 text-sm">Ninguno.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="bg-white rounded-lg border border-amber-300 overflow-hidden">
+    <div class="bg-amber-500 text-white px-4 py-3 font-bold">
+      ⚠️ Revisar ({{ revisar|length }})
+    </div>
+    <ul class="divide-y divide-slate-200">
+      {% for item in revisar %}
+        <li class="p-4 text-sm">
+          <div class="font-semibold">
+            {{ (item.data.albaran.numero if item.data.albaran else '—') or '—' }}
+            · {{ (item.data.albaran.fecha if item.data.albaran else '') or '' }}
+          </div>
+          <div class="text-slate-500">
+            {{ (item.data.proveedor.nombre if item.data.proveedor else item.original_filename) or item.original_filename }}
+          </div>
+          <div class="text-amber-700 mt-1">
+            Confianza: {{ (item.data.confianza.global if item.data.confianza else '—') }}
+            ({{ (item.data.confianza.puntuacion_0_100 if item.data.confianza else 0) }}/100)
+          </div>
+          <a href="/revision/{{ session_id }}/{{ item.id }}"
+             class="inline-block mt-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1 rounded">
+            Revisar
+          </a>
+        </li>
+      {% else %}
+        <li class="p-4 text-slate-400 text-sm">Nada por revisar. 🎉</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="bg-white rounded-lg border border-rose-300 overflow-hidden">
+    <div class="bg-rose-500 text-white px-4 py-3 font-bold">
+      ❌ Problemas ({{ problemas|length }})
+    </div>
+    <ul class="divide-y divide-slate-200">
+      {% for item in problemas %}
+        <li class="p-4 text-sm">
+          <div class="font-semibold">{{ item.original_filename }}</div>
+          <div class="text-rose-600 mt-1">
+            {{ item.data.motivo if item.data and item.data.motivo else (item.error or 'Ilegible') }}
+          </div>
+        </li>
+      {% else %}
+        <li class="p-4 text-slate-400 text-sm">Ninguno.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<!-- JSON modal -->
+<div id="json-modal" class="hidden fixed inset-0 bg-black/50 items-center justify-center z-50 p-6">
+  <div class="bg-white rounded-lg max-w-3xl w-full max-h-[85vh] overflow-auto p-4">
+    <div class="flex justify-between items-center mb-2">
+      <h3 class="font-semibold">JSON extraído</h3>
+      <button onclick="document.getElementById('json-modal').classList.add('hidden'); document.getElementById('json-modal').classList.remove('flex');" class="text-slate-500 hover:text-slate-800">✕</button>
+    </div>
+    <pre id="json-body" class="text-xs bg-slate-900 text-slate-100 p-4 rounded overflow-auto"></pre>
+  </div>
+</div>
+
+<script>
+function showJson(data) {
+  document.getElementById("json-body").textContent = JSON.stringify(data, null, 2);
+  const m = document.getElementById("json-modal");
+  m.classList.remove("hidden");
+  m.classList.add("flex");
+}
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Revisión — Procesador de Albaranes{% endblock %}
+{% block content %}
+{% if item is none %}
+  <div class="bg-white rounded-lg border p-10 text-center">
+    <div class="text-5xl mb-4">🎉</div>
+    <h2 class="text-2xl font-bold mb-2">No queda nada por revisar</h2>
+    <p class="text-slate-600 mb-6">Puedes pasar al resumen final para exportar.</p>
+    <a href="/resumen/{{ session_id }}" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded">
+      Ir al resumen
+    </a>
+  </div>
+{% else %}
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold">
+        Albarán {{ index }} de {{ total }}
+      </h1>
+      <p class="text-slate-600 text-sm">
+        Archivo: <span class="font-mono">{{ item.original_filename }}</span>
+        · Confianza:
+        {% set conf = item.data.confianza.global if item.data.confianza else 'media' %}
+        {% set punt = item.data.confianza.puntuacion_0_100 if item.data.confianza else 0 %}
+        <span class="font-semibold
+          {% if conf == 'alta' %}text-emerald-600
+          {% elif conf == 'media' %}text-amber-600
+          {% else %}text-rose-600{% endif %}">
+          {{ conf|upper }} ({{ punt }}/100)
+        </span>
+      </p>
+    </div>
+    <div class="text-sm space-x-2">
+      <a href="/resultados/{{ session_id }}" class="text-slate-600 hover:text-slate-900">Volver al inicio</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="min-height: 80vh;">
+    <!-- Left: image viewer -->
+    <div class="bg-white rounded-lg border overflow-hidden flex flex-col">
+      <div class="flex items-center gap-2 bg-slate-100 border-b px-3 py-2 text-sm">
+        <button type="button" id="zoom-in" class="px-2 py-1 bg-white border rounded hover:bg-slate-50">🔍+</button>
+        <button type="button" id="zoom-out" class="px-2 py-1 bg-white border rounded hover:bg-slate-50">🔍−</button>
+        <button type="button" id="rotate" class="px-2 py-1 bg-white border rounded hover:bg-slate-50">⟳</button>
+        <button type="button" id="fit" class="px-2 py-1 bg-white border rounded hover:bg-slate-50">Ajustar</button>
+        {% if item.preview_urls and item.preview_urls|length > 1 %}
+          <span class="ml-auto text-slate-600">
+            Página <span id="page-num">1</span>/{{ item.preview_urls|length }}
+          </span>
+          <button type="button" id="prev-page" class="px-2 py-1 bg-white border rounded">◀</button>
+          <button type="button" id="next-page" class="px-2 py-1 bg-white border rounded">▶</button>
+        {% endif %}
+      </div>
+      <div id="image-container" class="flex-1 overflow-auto bg-slate-200 flex items-start justify-center p-4">
+        {% if item.ext == '.pdf' %}
+          {% if item.preview_urls %}
+            <img id="albaran-image"
+                 data-pages='{{ item.preview_urls | tojson }}'
+                 src="{{ item.preview_urls[0] }}" class="shadow-lg bg-white transition-transform origin-top-left"
+                 style="transform: scale(1) rotate(0deg);" />
+          {% else %}
+            <iframe src="{{ item.static_url }}" class="w-full h-[75vh]"></iframe>
+          {% endif %}
+        {% else %}
+          <img id="albaran-image" src="{{ item.static_url }}" class="shadow-lg bg-white transition-transform origin-top-left"
+               style="transform: scale(1) rotate(0deg);" />
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right: editable form -->
+    <div class="bg-white rounded-lg border overflow-hidden flex flex-col">
+      <form id="revision-form" class="flex-1 overflow-auto p-4 space-y-4"
+            data-session="{{ session_id }}"
+            data-item="{{ item.id }}"
+            data-next="{{ next_id or '' }}"
+            data-original='{{ item.data | tojson }}'>
+      </form>
+      <div class="border-t bg-slate-50 p-3 flex items-center justify-between gap-2">
+        <div class="text-xs text-slate-500">
+          <kbd class="px-1 py-0.5 bg-white border rounded">Ctrl+Enter</kbd> confirmar ·
+          <kbd class="px-1 py-0.5 bg-white border rounded">Ctrl+D</kbd> descartar
+        </div>
+        <div class="space-x-2">
+          <button id="btn-descartar" type="button"
+                  class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm rounded">
+            Descartar este albarán
+          </button>
+          <button id="btn-confirmar" type="button"
+                  class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded">
+            ✓ Confirmar y siguiente
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/revision.js"></script>
+{% endblock %}
