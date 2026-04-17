@@ -136,21 +136,25 @@ export function validateShift(
         severity: "warning",
         message: `${location.name} est\u00e1 cerrado el ${["lunes","martes","mi\u00e9rcoles","jueves","viernes","s\u00e1bado","domingo"][dayIdx]}`,
       });
-    } else if (day && day.open) {
-      // Comprobar que el turno cae dentro de la franja de apertura
-      const openMin = timeToMin(day.from);
-      let closeMin = timeToMin(day.to);
-      if (closeMin <= openMin) closeMin += 24 * 60; // cierra al d\u00eda siguiente
-
+    } else if (day && day.open && day.ranges && day.ranges.length > 0) {
       const shiftStart = timeToMin(shift.start_time);
       let shiftEnd = timeToMin(shift.end_time);
       if (shiftEnd <= shiftStart) shiftEnd += 24 * 60;
 
-      if (shiftStart < openMin || shiftEnd > closeMin) {
+      // Comprobar que el turno est\u00e1 contenido en alguno de los rangos de apertura
+      const fitsInAnyRange = day.ranges.some((r) => {
+        const openMin = timeToMin(r.from);
+        let closeMin = timeToMin(r.to);
+        if (closeMin <= openMin) closeMin += 24 * 60;
+        return shiftStart >= openMin && shiftEnd <= closeMin;
+      });
+
+      if (!fitsInAnyRange) {
+        const rangesLabel = day.ranges.map((r) => `${r.from}-${r.to}`).join(", ");
         results.push({
           type: "outside_opening",
           severity: "warning",
-          message: `Turno fuera del horario de apertura (${day.from} - ${day.to})`,
+          message: `Turno fuera del horario de apertura (${rangesLabel})`,
         });
       }
     }

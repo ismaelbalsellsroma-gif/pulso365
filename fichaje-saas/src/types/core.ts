@@ -44,10 +44,18 @@ export interface Employee {
   updated_at: string;
 }
 
+export interface TimeRange {
+  from: string;  // "HH:MM"
+  to: string;    // "HH:MM"
+}
+
 export interface DayOpeningHours {
   open: boolean;
-  from: string;  // "HH:MM"
-  to: string;    // "HH:MM" — si < from, asume cierre al d\u00eda siguiente
+  /**
+   * M\u00faltiples rangos en el mismo d\u00eda (ej: 12-16 y 19-00 para turno partido).
+   * Si solo hay uno, el array tiene 1 elemento.
+   */
+  ranges: TimeRange[];
 }
 
 export type OpeningHours = {
@@ -63,14 +71,23 @@ export type OpeningHours = {
 export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type DayKey = typeof DAY_KEYS[number];
 
+export const DAY_LABELS: Record<DayKey, string> = {
+  mon: "Lunes", tue: "Martes", wed: "Mi\u00e9rcoles", thu: "Jueves",
+  fri: "Viernes", sat: "S\u00e1bado", sun: "Domingo",
+};
+
+export const DAY_SHORT: Record<DayKey, string> = {
+  mon: "L", tue: "M", wed: "X", thu: "J", fri: "V", sat: "S", sun: "D",
+};
+
 export const DEFAULT_OPENING_HOURS: OpeningHours = {
-  mon: { open: true, from: "08:00", to: "23:00" },
-  tue: { open: true, from: "08:00", to: "23:00" },
-  wed: { open: true, from: "08:00", to: "23:00" },
-  thu: { open: true, from: "08:00", to: "23:00" },
-  fri: { open: true, from: "08:00", to: "00:00" },
-  sat: { open: true, from: "10:00", to: "00:00" },
-  sun: { open: false, from: "10:00", to: "16:00" },
+  mon: { open: true, ranges: [{ from: "08:00", to: "23:00" }] },
+  tue: { open: true, ranges: [{ from: "08:00", to: "23:00" }] },
+  wed: { open: true, ranges: [{ from: "08:00", to: "23:00" }] },
+  thu: { open: true, ranges: [{ from: "08:00", to: "23:00" }] },
+  fri: { open: true, ranges: [{ from: "08:00", to: "00:00" }] },
+  sat: { open: true, ranges: [{ from: "10:00", to: "00:00" }] },
+  sun: { open: false, ranges: [{ from: "10:00", to: "16:00" }] },
 };
 
 export interface Location {
