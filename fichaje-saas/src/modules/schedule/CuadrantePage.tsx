@@ -182,14 +182,27 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
         planId = data?.id;
         qc.invalidateQueries({ queryKey: ["shift-plan"] });
       }
-      const payload = { ...form, plan_id: planId };
+      const basePayload = { ...form, plan_id: planId };
       if (editId) {
-        await supabase.from("shift_plan_items").update(payload).eq("id", editId);
+        await supabase.from("shift_plan_items").update(basePayload).eq("id", editId);
       } else {
-        await supabase.from("shift_plan_items").insert(payload);
+        // Insertar turno principal
+        await supabase.from("shift_plan_items").insert(basePayload);
+        // Repetir en los días seleccionados
+        const extraDays = repeatDays
+          .map((checked, i) => checked ? format(weekDates[i], "yyyy-MM-dd") : null)
+          .filter((d): d is string => d !== null && d !== form.work_date);
+        for (const extraDate of extraDays) {
+          await supabase.from("shift_plan_items").insert({ ...basePayload, work_date: extraDate });
+        }
       }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["shift-items"] }); setDialogOpen(false); toast.success(editId ? "Turno actualizado" : "Turno asignado"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["shift-items"] });
+      setDialogOpen(false);
+      const extra = repeatDays.filter(Boolean).length;
+      toast.success(editId ? "Turno actualizado" : extra > 0 ? `Turno asignado en ${extra + 1} días` : "Turno asignado");
+    },
     onError: (e: any) => toast.error(e?.message ?? "Error"),
   });
 
@@ -301,7 +314,33 @@ export default function CuadrantePage({ profile }: { profile: Profile }) {
             <Link to="/app/cuadrante-ia">
               <Button size="sm" variant="ghost" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> IA</Button>
             </Link>
-            <Button size="sm" variant="ghost" className="gap-1.5"><Copy className="h-3.5 w-3.5" /> Copiar</Button>
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => {
+              if (demo) { toast.info("Modo demo"); return; }
+              toast.info("Copiando semana anterior...");
+              // Copy previous week's items to current week
+              const prevWeekStart = format(subWeeks(weekDates[0], 1), "yyyy-MM-dd");
+              supabase.from("shift_plans").select("id").eq("organization_id", orgId).eq("week_start", prevWeekStart).maybeSingle()
+                .then(({ data: prevPlan }) => {
+                  if (!prevPlan) { toast.error("No hay cuadrante en la semana anterior"); return; }
+                  supabase.from("shift_plan_items").select("*").eq("plan_id", prevPlan.id).then(async ({ data: prevItems }) => {
+                    if (!prevItems?.length) { toast.error("Semana anterior vacía"); return; }
+                    let planId = plan?.id;
+                    if (!planId) {
+                      const { data: np } = await supabase.from("shift_plans").insert({ organization_id: orgId, week_start: weekStart, status: "draft" }).select().single();
+                      planId = np?.id;
+                    }
+                    if (!planId) return;
+                    const mapped = prevItems.map((it) => {
+                      const oldDay = (new Date(it.work_date + "T00:00:00").getDay() + 6) % 7;
+                      return { employee_id: it.employee_id, plan_id: planId, work_date: format(weekDates[oldDay], "yyyy-MM-dd"), start_time: it.start_time, end_time: it.end_time, break_minutes: it.break_minutes, role: it.role, color: it.color, notes: it.notes, is_open_shift: it.is_open_shift };
+                    });
+                    await supabase.from("shift_plan_items").insert(mapped);
+                    qc.invalidateQueries({ queryKey: ["shift-plan"] });
+                    qc.invalidateQueries({ queryKey: ["shift-items"] });
+                    toast.success(`${mapped.length} turnos copiados de la semana anterior`);
+                  });
+                });
+            }}><Copy className="h-3.5 w-3.5" /> Copiar</Button>
             {plan?.status === "draft" && items.length > 0 ? (
               <Button size="sm" variant="primary" className="gap-1.5 rounded-full px-5" onClick={() => publishMut.mutate()} disabled={publishMut.isPending}>
                 Publicar la planificaci\u00f3n

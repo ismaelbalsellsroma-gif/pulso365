@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Clock, LogIn, LogOut, Coffee, Play, MapPin, ShieldCheck,
@@ -31,6 +31,7 @@ const DAYS_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export default function MyClockPage({ profile }: { profile: Profile }) {
   const orgId = profile.organization_id!;
   const demo = isDemoMode();
+  const qc = useQueryClient();
   const [tick, setTick] = useState(Date.now());
   const geo = useGeolocation(true);
 
@@ -189,17 +190,84 @@ export default function MyClockPage({ profile }: { profile: Profile }) {
   const geoBlocked = !!(rules?.require_geofence && fenceCheck && !fenceCheck.withinFence);
   const geoWaiting = !!(rules?.require_geofence && (geo.state.status === "loading" || geo.state.status === "idle"));
 
-  // Demo actions
+  // ── Mutations de fichaje (reales con Supabase) ──
+  const clockInMut = useMutation({
+    mutationFn: async () => {
+      if (!employee) throw new Error("Sin empleado");
+      const coords = geo.state.status === "ok" ? geo.state.coords : null;
+      const check = coords && location ? checkGeofence(coords, location) : null;
+      const { error } = await supabase.from("clock_sessions").insert({
+        organization_id: orgId, employee_id: employee.id,
+        location_id: employee.primary_location_id, work_date: todayDate(),
+        clock_in_at: new Date().toISOString(), status: "open",
+        source: empSession ? "mobile" : "web",
+        clock_in_lat: coords?.latitude ?? null, clock_in_lng: coords?.longitude ?? null,
+        clock_in_accuracy_m: coords?.accuracy ?? null,
+        within_geofence: check?.withinFence ?? null,
+        distance_from_location_m: check?.distance ?? null,
+        user_agent: navigator.userAgent,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-open-fichaje"] }); qc.invalidateQueries({ queryKey: ["my-today-fichajes"] }); toast.success("Entrada registrada"); },
+    onError: (e: any) => toast.error(e?.message ?? "Error al fichar"),
+  });
+
+  const clockOutMut = useMutation({
+    mutationFn: async () => {
+      if (!openFichaje) throw new Error("Sin fichaje abierto");
+      const coords = geo.state.status === "ok" ? geo.state.coords : null;
+      const now = new Date().toISOString();
+      const worked = computeWorkedMinutes(openFichaje.clock_in_at, now, openFichaje.break_minutes);
+      const { error } = await supabase.from("clock_sessions").update({
+        clock_out_at: now, worked_minutes: worked, status: "closed",
+        clock_out_lat: coords?.latitude ?? null, clock_out_lng: coords?.longitude ?? null,
+        clock_out_accuracy_m: coords?.accuracy ?? null,
+      }).eq("id", openFichaje.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-open-fichaje"] }); qc.invalidateQueries({ queryKey: ["my-today-fichajes"] }); toast.success("Salida registrada"); },
+    onError: (e: any) => toast.error(e?.message ?? "Error al fichar salida"),
+  });
+
+  const startBreakMut = useMutation({
+    mutationFn: async () => {
+      if (!openFichaje) throw new Error("Sin fichaje abierto");
+      await supabase.from("fichaje_breaks").insert({ fichaje_id: openFichaje.id, break_start_at: new Date().toISOString(), break_type: "pause" });
+      await supabase.from("clock_sessions").update({ status: "on_break" }).eq("id", openFichaje.id);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-open-fichaje"] }); toast.success("Pausa iniciada"); },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  const endBreakMut = useMutation({
+    mutationFn: async () => {
+      if (!openFichaje) throw new Error("Sin fichaje abierto");
+      const { data: breaks } = await supabase.from("fichaje_breaks").select("*").eq("fichaje_id", openFichaje.id).is("break_end_at", null).limit(1);
+      const ab = breaks?.[0];
+      if (ab) {
+        const now = new Date().toISOString();
+        const dur = Math.round((new Date(now).getTime() - new Date(ab.break_start_at).getTime()) / 60000);
+        await supabase.from("fichaje_breaks").update({ break_end_at: now, duration_minutes: dur }).eq("id", ab.id);
+        await supabase.from("clock_sessions").update({ status: "open", break_minutes: (openFichaje.break_minutes ?? 0) + dur }).eq("id", openFichaje.id);
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-open-fichaje"] }); toast.success("Pausa finalizada"); },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
   function handleClockIn() {
-    if (geoBlocked) { toast.error(`Est\u00e1s a ${Math.round(fenceCheck!.distance)}m del local. Acerc\u00e1te para fichar.`); return; }
-    toast.success("Entrada registrada (demo)");
+    if (geoBlocked) { toast.error("Fuera de zona. Ac\u00e9rcate al local."); return; }
+    if (demo) { toast.success("Entrada registrada (demo)"); return; }
+    clockInMut.mutate();
   }
   function handleClockOut() {
-    if (geoBlocked) { toast.error(`Est\u00e1s a ${Math.round(fenceCheck!.distance)}m del local. Acerc\u00e1te para fichar.`); return; }
-    toast.success("Salida registrada (demo)");
+    if (geoBlocked) { toast.error("Fuera de zona. Ac\u00e9rcate al local."); return; }
+    if (demo) { toast.success("Salida registrada (demo)"); return; }
+    clockOutMut.mutate();
   }
-  function handleStartBreak() { toast.success("Pausa iniciada (demo)"); }
-  function handleEndBreak() { toast.success("Pausa finalizada (demo)"); }
+  function handleStartBreak() { if (demo) { toast.success("Pausa iniciada (demo)"); return; } startBreakMut.mutate(); }
+  function handleEndBreak() { if (demo) { toast.success("Pausa finalizada (demo)"); return; } endBreakMut.mutate(); }
 
   const statusAbsence: Record<string, { label: string; variant: "amber" | "green" | "red" | "slate" }> = {
     pending: { label: "Pendiente", variant: "amber" },

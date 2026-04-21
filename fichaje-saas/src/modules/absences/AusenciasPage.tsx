@@ -46,7 +46,7 @@ export default function AusenciasPage({ profile }: { profile: Profile }) {
 
   const { data: balances = [] } = useQuery({
     queryKey: ["absence-balances", orgId],
-    queryFn: async () => { if (demo) return getDemoAbsenceBalances(); const { data } = await supabase.from("absence_balances").select("*"); return (data as AbsenceBalance[]) ?? []; },
+    queryFn: async () => { if (demo) return getDemoAbsenceBalances(); const { data } = await supabase.from("absence_balances").select("*, employees!inner(organization_id)").eq("employees.organization_id", orgId); return (data as AbsenceBalance[]) ?? []; },
   });
 
   const createMut = useMutation({

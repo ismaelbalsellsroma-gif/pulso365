@@ -384,11 +384,10 @@ export default function KioskPage() {
     if (dir === "out") await doClockOut(url);
   }
 
-  // Si no hay orgSlug, pedimos configuración
   // En demo, auto-configurar sin pedir slug
-  if (!orgSlug && demo) {
-    setOrgSlug(DEMO_ORG.slug);
-  }
+  useEffect(() => {
+    if (!orgSlug && demo) setOrgSlug(DEMO_ORG.slug);
+  }, [orgSlug, demo]);
 
   if (!orgSlug) {
     return <KioskSetup onSaved={(slug, loc) => {

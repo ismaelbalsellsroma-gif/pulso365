@@ -132,6 +132,7 @@ export default function CuadranteIAPage({ profile }: { profile: Profile }) {
       // 1. Crear/actualizar shift_plan
       const { data: plan, error: planErr } = await supabase.from("shift_plans").upsert({
         organization_id: orgId,
+        location_id: null,
         week_start: weekStart,
         status: "published",
         generated_by: "ai",
@@ -142,7 +143,7 @@ export default function CuadranteIAPage({ profile }: { profile: Profile }) {
         coverage_score: result.coverageScore,
         published_at: new Date().toISOString(),
         published_by: profile.id,
-      }, { onConflict: "organization_id,location_id,week_start" }).select().single();
+      }, { onConflict: "organization_id,location_id,week_start", ignoreDuplicates: false }).select().single();
       if (planErr) throw planErr;
 
       // 2. Borrar items previos y crear nuevos

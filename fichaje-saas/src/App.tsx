@@ -34,7 +34,7 @@ function Spinner() {
 export default function App() {
   const { session, profile, loading } = useAuth();
 
-  if (loading && session) return <Spinner />;
+  if (loading) return <Spinner />;
 
   return (
     <Routes>
